@@ -1,0 +1,143 @@
+package org.locationtech.sfcurve
+
+import java.util.Date
+
+object Dimensions {
+  case class Extent[T](min: T, max: T, incMin: Boolean = true, incMax: Boolean = false)(implicit ev: Ordering[T]) {
+    def contains(v: Any): Boolean = {
+      val value: T = v.asInstanceOf[T]
+      if (ev.lt(value, min)) return false
+      if (ev.gt(value, max)) return false
+      if (ev.eq(value, min) && !incMin) return false
+      if (ev.eq(value, max) && !incMax) return false
+      true
+    }
+
+    // ignores openness
+    def isPoint: Boolean = ev.equiv(min, max)
+  }
+
+  trait DimensionLike[T] {
+    def toBin(value: T, extent: Extent[T], cardinality: Long): Long
+    def toExtent(idx: Long, extent: Extent[T], cardinality: Long): Extent[T]
+  }
+
+  implicit object LongDimensionLike extends DimensionLike[Long] {
+    def toBin(value: Long, extent: Extent[Long], cardinality: Long): Long = {
+      require(extent.contains(value))
+      Math.round((value - extent.min) * cardinality.toDouble / (extent.max - extent.min))
+    }
+
+    def toExtent(bin: Long, extent: Extent[Long], cardinality: Long): Extent[Long] = {
+      require(bin >= 0 && bin < cardinality)
+      val x0: Long = extent.min + Math.floor(bin.toDouble / cardinality.toDouble * (extent.max - extent.min)).toLong
+      val x1: Long = extent.min + Math.floor((1.0 + bin.toDouble) / cardinality.toDouble * (extent.max - extent.min)).toLong
+      Extent(x0, x1, incMin = true, incMax = false)
+    }
+  }
+
+  implicit object DoubleDimensionLike extends DimensionLike[Double] {
+    def toBin(value: Double, extent: Extent[Double], cardinality: Long): Long = {
+      require(extent.contains(value))
+      Math.round((value - extent.min) * cardinality.toDouble / (extent.max - extent.min))
+    }
+
+    def toExtent(bin: Long, extent: Extent[Double], cardinality: Long): Extent[Double] = {
+      require(bin >= 0 && bin < cardinality)
+      val x0: Double = extent.min + bin.toDouble / cardinality.toDouble * (extent.max - extent.min)
+      val x1: Double = extent.min + (1.0 + bin.toDouble) / cardinality.toDouble * (extent.max - extent.min)
+      Extent(x0, x1, incMin = true, incMax = false)
+    }
+  }
+
+  implicit def date2long(date: Date): Long = date.getTime
+  implicit def long2date(long: Long): Date = new Date(long)
+  implicit def dex2lex(extent: Extent[Date]): Extent[Long] =
+    Extent[Long](date2long(extent.min), date2long(extent.max), extent.incMin, extent.incMax)
+  implicit def lex2dex(extent: Extent[Long]): Extent[Date] =
+    Extent[Date](long2date(extent.min), long2date(extent.max), extent.incMin, extent.incMax)
+
+  implicit object DateDimensionLike extends DimensionLike[Date] {
+    def toBin(value: Date, extent: Extent[Date], cardinality: Long): Long =
+      LongDimensionLike.toBin(date2long(value), extent, cardinality)
+
+    def toExtent(bin: Long, extent: Extent[Date], cardinality: Long): Extent[Date] =
+      LongDimensionLike.toExtent(bin, extent, cardinality)
+  }
+
+  trait Discretizor {
+    def cardinality: Long
+    def arity: Int
+    def index(values: DimensionLike[_]*): Long
+    def inverseIndex(index: Long): Cell
+  }
+
+  trait Dimension[T] extends Discretizor {
+    def ev: DimensionLike[T]
+    def extent: Extent[T]
+
+    val arity: Int = 1
+
+    def toBin(value: T): Long = ev.toBin(value, extent, cardinality)
+
+    def toExtent(bin: Long): Extent[T] = ev.toExtent(bin, extent, cardinality)
+
+    def index(values: DimensionLike[_]*): Long = {
+      require(values.size == 1)
+      values.head match {
+        case value: T => toBin(value)
+        case _ => throw new Exception("Invalid value type for index")
+      }
+    }
+
+    def inverseIndex(index: Long): Cell = {
+      val extent: Extent[Dimension[_]] = toExtent(index).asInstanceOf[Extent[Dimension[_]]]
+      val extents: Vector[Extent[Dimension[_]]] = Vector(extent)
+      Cell(extents)
+    }
+
+    // dummy identity function; some dimensions may override this
+    def normalize(value: T): T = value
+  }
+
+  case class Longitude(cardinality: Long) extends Dimension[Double] {
+    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
+    val extent: Extent[Double] = Extent[Double](-180.0, 180.0, incMin = true, incMax = false)
+  }
+
+  case class Cell(extents: Vector[Extent[Dimension[_]]]) {
+    val numDimensions: Int = extents.size
+
+    def contains(point: Vector[Dimension[_]]): Boolean = {
+      if (point.size != numDimensions) return false
+      extents.zip(point).forall {
+        case (extent, coord) => extent.contains(coord)
+      }
+    }
+  }
+
+  trait SpaceFillingCurve extends Discretizor {
+    def children: Vector[Discretizor]
+    require(children != null && children.nonEmpty)
+
+    // how many possible values can the `index` method return?
+    def cardinality: Long = children.map(_.cardinality).product
+
+    // how many dimension leaf-nodes are there?
+    def arity: Int = children.map(_.arity).sum
+
+    // these two routines are the heart of the SFC
+    def fold(subordinates: Long*): Long
+    def unfold(index: Long): Vector[Long]
+
+    def index(values: DimensionLike[_]*): Long = {
+      // TODO
+      ???
+    }
+
+    def inverseIndex(index: Long): Cell = {
+      // TODO
+      ???
+    }
+  }
+}
