@@ -131,7 +131,7 @@ object Dimensions {
     }
   }
 
-  case class Cell(extents: Vector[Extent[Dimension[_]]]) {
+  case class Cell(extents: Vector[Extent[Dimension[_]]] = Vector()) {
     val numDimensions: Int = extents.size
 
     def contains(point: Vector[Dimension[_]]): Boolean = {
@@ -140,6 +140,8 @@ object Dimensions {
         case (extent, coord) => extent.contains(coord)
       }
     }
+
+    def +(that: Cell): Cell = Cell(extents ++ that.extents)
   }
 
   trait SpaceFillingCurve extends Discretizor {
@@ -160,20 +162,33 @@ object Dimensions {
       require(values.size == arity)
 
       // defer to your children, be they SFCs or Dimensions
-      val subordinates: Seq[Long] = children.fold((values, Seq[Long]()))((acc, child) => acc match {
+      val subordinates: Seq[Long] = children.foldLeft((values, Seq[Long]()))((acc, child) => acc match {
         case (valuesLeft: Seq[DimensionLike[_]], subsSoFar: Seq[Long]) =>
           val childValues: Seq[DimensionLike[_]] = valuesLeft.take(child.arity)
           val childIndex: Long = child.index(childValues)
           (valuesLeft.drop(child.arity), subsSoFar :+ childIndex)
-      })._1._2
+      })._2
 
       // roll up the child indexes into a single index
       fold(subordinates)
     }
 
     def inverseIndex(index: Long): Cell = {
-      // TODO
-      ???
+      // unfold this index to get the child indexes to recurse
+      val subordinates: Seq[Long] = unfold(index)
+
+      // this should always be true
+      require(subordinates.size == children.size)
+
+      val cell: Cell = children.zip(subordinates).foldLeft(Cell())((acc, t) => t match {
+        case (child, childIndex) =>
+          acc + child.inverseIndex(childIndex)
+      })
+
+      // sanity check
+      require(cell.extents.size == arity)
+
+      cell
     }
   }
 }
