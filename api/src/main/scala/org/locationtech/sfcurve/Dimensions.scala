@@ -68,10 +68,17 @@ object Dimensions {
   trait Discretizor {
     def cardinality: Long
     def arity: Int
-    def index(values: DimensionLike[_]*): Long
+    def index(values: Seq[DimensionLike[_]]): Long
     def inverseIndex(index: Long): Cell
   }
 
+  /**
+    * This is a discretizor that knows how to partition a typed
+    * space into bins (and backwards).  Examples:  Double-valued
+    * spaces such as real-number ranges; Date-valued spaces; etc.
+    *
+    * @tparam T describes the space being partitioned
+    */
   trait Dimension[T] extends Discretizor {
     def ev: DimensionLike[T]
     def extent: Extent[T]
@@ -82,7 +89,7 @@ object Dimensions {
 
     def toExtent(bin: Long): Extent[T] = ev.toExtent(bin, extent, cardinality)
 
-    def index(values: DimensionLike[_]*): Long = {
+    def index(values: Seq[DimensionLike[_]]): Long = {
       require(values.size == 1)
       values.head match {
         case value: T => toBin(value)
@@ -100,9 +107,28 @@ object Dimensions {
     def normalize(value: T): T = value
   }
 
+  // defined over [-180.0, 180.0)
   case class Longitude(cardinality: Long) extends Dimension[Double] {
     val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
     val extent: Extent[Double] = Extent[Double](-180.0, 180.0, incMin = true, incMax = false)
+    override def normalize(value: Double): Double = {
+      var v = value
+      while (v < -180.0) v = 360.0
+      while (v >= 180.0) v -= 360.0
+      v
+    }
+  }
+
+  // defined over [-90.0, 90.0)
+  case class Latitude(cardinality: Long) extends Dimension[Double] {
+    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
+    val extent: Extent[Double] = Extent[Double](-180.0, 180.0, incMin = true, incMax = false)
+    override def normalize(value: Double): Double = {
+      var v = value
+      while (v < -90.0) v = 180.0
+      while (v >= 90.0) v -= 180.0
+      v
+    }
   }
 
   case class Cell(extents: Vector[Extent[Dimension[_]]]) {
@@ -127,12 +153,22 @@ object Dimensions {
     def arity: Int = children.map(_.arity).sum
 
     // these two routines are the heart of the SFC
-    def fold(subordinates: Long*): Long
+    def fold(subordinates: Seq[Long]): Long
     def unfold(index: Long): Vector[Long]
 
-    def index(values: DimensionLike[_]*): Long = {
-      // TODO
-      ???
+    def index(values: Seq[DimensionLike[_]]): Long = {
+      require(values.size == arity)
+
+      // defer to your children, be they SFCs or Dimensions
+      val subordinates: Seq[Long] = children.fold((values, Seq[Long]()))((acc, child) => acc match {
+        case (valuesLeft: Seq[DimensionLike[_]], subsSoFar: Seq[Long]) =>
+          val childValues: Seq[DimensionLike[_]] = valuesLeft.take(child.arity)
+          val childIndex: Long = child.index(childValues)
+          (valuesLeft.drop(child.arity), subsSoFar :+ childIndex)
+      })._1._2
+
+      // roll up the child indexes into a single index
+      fold(subordinates)
     }
 
     def inverseIndex(index: Long): Cell = {
