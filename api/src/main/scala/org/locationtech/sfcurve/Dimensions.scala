@@ -170,6 +170,7 @@ object Dimensions {
     // they will be made concrete per descendant curve
     def fold(subordinates: Seq[Long]): Long
     def unfold(index: Long): Vector[Long]
+    def getIndexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long]): Seq[IndexRange]
 
     def index(values: Seq[DimensionLike[_]]): Long = {
       require(values.size == arity)
@@ -222,6 +223,59 @@ object Dimensions {
       consolidateRanges(subordinates)
     }
 
+    // copied from https://github.com/aheyne/geomesa/blob/master/geomesa-utils/src/main/scala/org/locationtech/geomesa/utils/iterators/CartesianProductIterable.scala
+    /**
+      * Can create an iterator over all combinations of items from a list-of-lists.
+      * Because the final list of combinations can be large, we allow for a safe
+      * way to query the list size that is independent of the iterator itself.
+      * (That is, asking for the size does not exhaust any iterator.)
+      *
+      * NB:  The first sequence is the least significant; that is, it will
+      * increment fast while the last sequence is the most significant (will
+      * increment slowly).
+      *
+      * @param seqs the list-of-lists whose items are to be recombined
+      * @tparam T the type of items
+      */
+    case class CartesianProductIterable(seqs: Seq[Seq[_]]) extends Iterable[Seq[_]] {
+      lazy val expectedSize: Long = seqs.map(_.size.toLong).product
+
+      def iterator: Iterator[Seq[_]] = new Iterator[Seq[_]] {
+        val n: Int = seqs.size
+        val maxes: Vector[Int] = seqs.map(seq => seq.size).toVector
+        val indexes = new scala.collection.mutable.ArraySeq[Int](seqs.size)
+        var nextItem: Seq[_] = if (isValid) realize else null
+
+        def isValid: Boolean = (0 until n).forall(i => indexes(i) < maxes(i))
+
+        def realize: Seq[_] = (0 until n).map(i => seqs(i)(indexes(i)))
+
+        def hasNext: Boolean = nextItem != null
+
+        def next(): Seq[_] = {
+          if (nextItem == null) throw new Exception("Iterator exhausted")
+          val result = nextItem
+
+          // advance the internal state
+          nextItem = null
+          var j = 0
+          var done = false
+          while (j < n && !done) {
+            indexes(j) = indexes(j) + 1
+            if (indexes(j) >= maxes(j)) {
+              indexes(j) = 0
+              j = j + 1
+            } else {
+              done = true
+            }
+          }
+          if (done || j < n) nextItem = realize
+
+          result
+        }
+      }
+    }
+
     /**
       * To have gotten here, we have already retrieved all of the consolidated
       * index ranges from all children.  For example, given these raw values:
@@ -261,8 +315,8 @@ object Dimensions {
       *   1048619-1048630
       *   1048712-1048800
       *
-      * This example, by virtue of being made up from wholecloth, does not honor the
-      * constraints that you would expect in a real curve.  To wit:
+      * This example, by virtue of being made up from whole cloth, does not honor
+      * the constraints that you would expect in a real curve.  To wit:
       *
       * 1.  The total number of cells in the input ranges MUST be equal
       *     to the number of cells in the consolidated, output ranges.
@@ -279,7 +333,13 @@ object Dimensions {
       // there must be one sequence, even if empty, per child
       require(subRanges.size == children.size)
 
-
+      val productItr: Iterator[Seq[_]] = CartesianProductIterable(subRanges).iterator
+      for (combination <- productItr) {
+        // find the minimum index
+        val lowerCorner = combination.map(dimRange => dimRange.asInstanceOf[IndexRange].lower)
+        val upperCorner = combination.map(dimRange => dimRange.asInstanceOf[IndexRange].upper)
+        val ranges: Seq[IndexRange] = getIndexRanges(lowerCorner, upperCorner)
+      }
     }
   }
 }
