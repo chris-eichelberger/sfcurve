@@ -70,6 +70,7 @@ object Dimensions {
     def arity: Int
     def index(values: Seq[DimensionLike[_]]): Long
     def inverseIndex(index: Long): Cell
+    def getQueryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Seq[IndexRange]
   }
 
   /**
@@ -82,6 +83,7 @@ object Dimensions {
   trait Dimension[T] extends Discretizor {
     def ev: DimensionLike[T]
     def extent: Extent[T]
+    def fullIndexRange: IndexRange = CoveredRange(0, cardinality - 1)
 
     val arity: Int = 1
 
@@ -105,6 +107,16 @@ object Dimensions {
 
     // dummy identity function; some dimensions may override this
     def normalize(value: T): T = value
+
+    // a dimension will always return a contiguous range of bin indexes from a
+    // contiguous range of raw input values
+    def getQueryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+      require(extents.size == 1)
+      val subExtent = extents.head
+      if (subExtent.isEmpty) return Seq(fullIndexRange)
+      if (subExtent.contains(extent)) return Seq(fullIndexRange)
+      Seq(CoveredRange(toBin(subExtent.get.min.asInstanceOf[T]), toBin(subExtent.get.max.asInstanceOf[T])))
+    }
   }
 
   // defined over [-180.0, 180.0)
@@ -154,7 +166,7 @@ object Dimensions {
     // how many dimension leaf-nodes are there?
     def arity: Int = children.map(_.arity).sum
 
-    // these two routines are the heart of the SFC;
+    // these routines are the heart of the SFC;
     // they will be made concrete per descendant curve
     def fold(subordinates: Seq[Long]): Long
     def unfold(index: Long): Vector[Long]
@@ -190,6 +202,84 @@ object Dimensions {
       require(cell.extents.size == arity)
 
       cell
+    }
+
+    def getQueryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+      // assume that unqueried dimensions are either:
+      // 1.  an option set to its full extent; or
+      // 2.  a None
+      require(extents.size == arity)
+
+      // defer to your children, be they SFCs or Dimensions
+      val subordinates: Seq[Seq[IndexRange]] = children.foldLeft((extents, Seq[Seq[IndexRange]]()))((acc, child) => acc match {
+        case (extentsLeft: Seq[Option[Extent[_]]], subsSoFar: Seq[IndexRange]) =>
+          val childExtents: Seq[Option[Extent[_]]] = extentsLeft.take(child.arity)
+          val childRanges: Seq[IndexRange] = child.getQueryRanges(childExtents)
+          (extentsLeft.drop(child.arity), subsSoFar :+ childRanges)
+      })._2
+
+      // roll up the child index-ranges into a single index-range
+      consolidateRanges(subordinates)
+    }
+
+    /**
+      * To have gotten here, we have already retrieved all of the consolidated
+      * index ranges from all children.  For example, given these raw values:
+      *
+      *   Z(
+      *     H(x: [-80, -79], y: [38, 39]),  // curve
+      *     t: [2018-12-01, 2018-12-31]     // dimension
+      *   )
+      *
+      * it might produce these index ranges to be consolidated by the parent
+      * Z-order curve (values are made up for example purposes):
+      *
+      *   Z(
+      *     H:  1001-1003, 1021-1023, 2017, 2018, 3001  // curves can return disjoint ranges
+      *     t:  65530-65535                             // dimensions return only zero or one contiguous range
+      *   )
+      *
+      * The *naive* process the Z-order curve has to do next is to consider
+      * the full cartesian product of the start/stop pairs from its children,
+      * and compute the ranges that fall inside, consolidating them as
+      * appropriate.  For this case (values are made up for this example):
+      *
+      *   order_and_consolidate(
+      *     Z(1001, 65530) .. Z(1003, 65535) -> 1048572-1048575, 1048604, 1048712-1048800
+      *     Z(1021, 65530) .. Z(1023, 65535) -> 11-15, 19-31, 90
+      *     Z(2017, 65530) .. Z(2018, 65535) -> 1048605-1048610, 1048620-1048630
+      *     Z(3001, 65530) .. Z(3001, 65535) -> 1048619, 91-93
+      *   )
+      *
+      * would consolidate to this final set of (made up, example!) ranges:
+      *
+      *   11-15
+      *   19-31
+      *   90-93
+      *   1048572-1048575
+      *   1048604-1048610
+      *   1048619-1048630
+      *   1048712-1048800
+      *
+      * This example, by virtue of being made up from wholecloth, does not honor the
+      * constraints that you would expect in a real curve.  To wit:
+      *
+      * 1.  The total number of cells in the input ranges MUST be equal
+      *     to the number of cells in the consolidated, output ranges.
+      * 2.  The maximum index from any child cannot exceed the maximum
+      *     possible index in the parent.  (The indexes *reported* by
+      *     children can exceed those *reported* by the parent, but only
+      *     when the child indexes remain smaller than the maximum
+      *     cardinality of the parent.)
+      *
+      * @param subRanges
+      * @return
+      */
+    def consolidateRanges(subRanges: Seq[Seq[IndexRange]]): Seq[IndexRange] = {
+      // there must be one sequence, even if empty, per child
+      require(subRanges.size == children.size)
+
+
     }
   }
 }
