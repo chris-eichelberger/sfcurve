@@ -154,7 +154,8 @@ object Dimensions {
     // how many dimension leaf-nodes are there?
     def arity: Int = children.map(_.arity).sum
 
-    // these two routines are the heart of the SFC
+    // these two routines are the heart of the SFC;
+    // they will be made concrete per descendant curve
     def fold(subordinates: Seq[Long]): Long
     def unfold(index: Long): Vector[Long]
 
