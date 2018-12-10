@@ -318,20 +318,35 @@ object Dimensions {
       * This example, by virtue of being made up from whole cloth, does not honor
       * the constraints that you would expect in a real curve.  To wit:
       *
-      * 1.  The total number of cells in the input ranges MUST be equal
+      * 1.  The product of the number of cells in the input ranges MUST be equal
       *     to the number of cells in the consolidated, output ranges.
+      *     That is:  (x:[1-5, 10-19], y:[100-119]) -> [z1-z2], [z3-z4], ..., [zN-zM]
+      *     such that sum of all the z-ranges is |x||y| = 15x20 = 300.
       * 2.  The maximum index from any child cannot exceed the maximum
       *     possible index in the parent.  (The indexes *reported* by
       *     children can exceed those *reported* by the parent, but only
       *     when the child indexes remain smaller than the maximum
       *     cardinality of the parent.)
       *
+      * NB:  This default implementation handles everything IN MEMORY, which is
+      * likely a _terrible_ way to do things (for SFCs of non-trivial size).
+      * Use this routine at your own risk!
+      *
       * @param subRanges
       * @return
       */
     def consolidateRanges(subRanges: Seq[Seq[IndexRange]]): Seq[IndexRange] = {
-      // there must be one sequence, even if empty, per child
+      // there must be one sequence, per child
       require(subRanges.size == children.size)
+
+      val numCellsExpected = subRanges.map {
+        case r: Seq[IndexRange] if r.isEmpty => 0
+        case r: Seq[IndexRange]              => r.map(iRange => iRange.size).sum
+      }.product
+
+      // degenerate case:  at least one dimension has no coverage, so the
+      // intersection must be empty
+      if (numCellsExpected == 0L) return Seq()
 
       val productItr: Iterator[Seq[_]] = CartesianProductIterable(subRanges).iterator
       for (combination <- productItr) {

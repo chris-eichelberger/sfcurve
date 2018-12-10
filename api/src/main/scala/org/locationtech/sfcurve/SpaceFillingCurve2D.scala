@@ -15,6 +15,7 @@ sealed trait IndexRange {
   def upper: Long
   def contained: Boolean
   def tuple = (lower, upper, contained)
+  def size: Long = upper - lower + 1
 }
 
 case class CoveredRange(lower: Long, upper: Long) extends IndexRange {
