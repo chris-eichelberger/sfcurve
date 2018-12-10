@@ -3,6 +3,23 @@ package org.locationtech.sfcurve
 import org.locationtech.sfcurve.Dimensions.{Discretizor, SpaceFillingCurve}
 import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
+import scala.collection.immutable.TreeMap
+
+/**
+  * This is the class responsible for supporting the in-memory
+  * consolidation of index ranges into contiguous subsets.
+  *
+  * @param byFirst
+  * @param byLast
+  */
+case class IndexedRanges(maxGap: Long, byFirst: TreeMap[Long, IndexRange], byLast: TreeMap[Long, IndexRange]) extends Iterable[IndexRange] {
+  def +(indexRange: IndexRange): IndexedRanges = {
+    
+  }
+
+  def iterator: Iterator[IndexRange] = byFirst.valuesIterator
+}
+
 trait RangeConsolidator {
   this: SpaceFillingCurve =>
   def children: Vector[Discretizor]
