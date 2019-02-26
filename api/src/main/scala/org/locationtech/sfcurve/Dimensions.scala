@@ -2,19 +2,27 @@ package org.locationtech.sfcurve
 
 import java.util.Date
 
+import org.locationtech.sfcurve.Utilities.CartesianProductIterable
+
 object Dimensions {
   case class Extent[T](min: T, max: T, incMin: Boolean = true, incMax: Boolean = false)(implicit ev: Ordering[T]) {
-    def contains(v: Any): Boolean = {
-      val value: T = v.asInstanceOf[T]
+    def contains(v: Any): Boolean = v match { case value: T =>
+      //val value: T = v.asInstanceOf[T]
       if (ev.lt(value, min)) return false
       if (ev.gt(value, max)) return false
-      if (ev.eq(value, min) && !incMin) return false
-      if (ev.eq(value, max) && !incMax) return false
+      if (ev.equiv(value, min) && !incMin) return false
+      if (ev.equiv(value, max) && !incMax) return false
       true
     }
 
     // ignores openness
     def isPoint: Boolean = ev.equiv(min, max)
+  }
+
+  implicit val dateOrdering: Ordering[Date] = new Ordering[Date] {
+    def compare(a: Date, b: Date): Int = {
+      a.getTime.compare(b.getTime)
+    }
   }
 
   trait DimensionLike[T] {
@@ -24,8 +32,8 @@ object Dimensions {
 
   implicit object LongDimensionLike extends DimensionLike[Long] {
     def toBin(value: Long, extent: Extent[Long], cardinality: Long): Long = {
-      require(extent.contains(value))
-      Math.round((value - extent.min) * cardinality.toDouble / (extent.max - extent.min))
+      //require(extent.contains(value))
+      Math.max(0, Math.min(cardinality - 1, Math.floor((value - extent.min) * cardinality.toDouble / (extent.max - extent.min)).toLong))
     }
 
     def toExtent(bin: Long, extent: Extent[Long], cardinality: Long): Extent[Long] = {
@@ -38,8 +46,9 @@ object Dimensions {
 
   implicit object DoubleDimensionLike extends DimensionLike[Double] {
     def toBin(value: Double, extent: Extent[Double], cardinality: Long): Long = {
-      require(extent.contains(value))
-      Math.round((value - extent.min) * cardinality.toDouble / (extent.max - extent.min))
+      //require(extent.contains(value))
+      Math.max(0, Math.min(cardinality - 1, ((value - extent.min) * cardinality / (extent.max - extent.min)).toLong))
+      //((x + 180) * (precision - 1) / 360d).toLong
     }
 
     def toExtent(bin: Long, extent: Extent[Double], cardinality: Long): Extent[Double] = {
@@ -68,9 +77,9 @@ object Dimensions {
   trait Discretizor{
     def cardinality: Long
     def arity: Int
-    def index(values: Seq[DimensionLike[_]]): Long
+    def index(values: Seq[Any]): Long
     def inverseIndex(index: Long): Cell
-    def getQueryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Seq[IndexRange]
+    def queryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Iterator[IndexRange]
   }
 
   /**
@@ -91,10 +100,10 @@ object Dimensions {
 
     def toExtent(bin: Long): Extent[T] = ev.toExtent(bin, extent, cardinality)
 
-    def index(values: Seq[DimensionLike[_]]): Long = {
+    def index(values: Seq[Any]): Long = {
       require(values.size == 1)
       values.head match {
-        case value: T => toBin(value)
+        case value: T => toBin(normalize(value))
         case _ => throw new Exception("Invalid value type for index")
       }
     }
@@ -110,12 +119,12 @@ object Dimensions {
 
     // a dimension will always return a contiguous range of bin indexes from a
     // contiguous range of raw input values
-    def getQueryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    def queryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Iterator[IndexRange] = {
       require(extents.size == 1)
       val subExtent = extents.head
-      if (subExtent.isEmpty) return Seq(fullIndexRange)
-      if (subExtent.contains(extent)) return Seq(fullIndexRange)
-      Seq(CoveredRange(toBin(subExtent.get.min.asInstanceOf[T]), toBin(subExtent.get.max.asInstanceOf[T])))
+      if (subExtent.isEmpty) return Seq(fullIndexRange).iterator
+      if (subExtent.contains(extent)) return Seq(fullIndexRange).iterator
+      Seq(CoveredRange(toBin(subExtent.get.min.asInstanceOf[T]), toBin(subExtent.get.max.asInstanceOf[T]))).iterator
     }
   }
 
@@ -125,7 +134,7 @@ object Dimensions {
     val extent: Extent[Double] = Extent[Double](-180.0, 180.0, incMin = true, incMax = false)
     override def normalize(value: Double): Double = {
       var v = value
-      while (v < -180.0) v = 360.0
+      while (v < -180.0) v += 360.0
       while (v >= 180.0) v -= 360.0
       v
     }
@@ -134,19 +143,43 @@ object Dimensions {
   // defined over [-90.0, 90.0)
   case class Latitude(cardinality: Long) extends Dimension[Double] {
     val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](-180.0, 180.0, incMin = true, incMax = false)
+    val extent: Extent[Double] = Extent[Double](-90.0, 90.0, incMin = true, incMax = true)
     override def normalize(value: Double): Double = {
       var v = value
-      while (v < -90.0) v = 180.0
-      while (v >= 90.0) v -= 180.0
+      while (v < -90.0) v += 180.0
+      while (v > 90.0) v -= 180.0
       v
     }
   }
 
-  case class Cell(extents: Vector[Extent[Dimension[_]]] = Vector()) {
+  // defined over [0.0, 360.0)
+  case class NonNegativeLongitude(cardinality: Long) extends Dimension[Double] {
+    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
+    val extent: Extent[Double] = Extent[Double](0.0, 360.0, incMin = true, incMax = false)
+    override def normalize(value: Double): Double = {
+      var v = value
+      while (v < 0.0) v += 360.0
+      while (v >= 360.0) v -= 360.0
+      v
+    }
+  }
+
+  // defined over [0.0, 180.0)
+  case class NonNegativeLatitude(cardinality: Long) extends Dimension[Double] {
+    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
+    val extent: Extent[Double] = Extent[Double](0.0, 180.0, incMin = true, incMax = true)
+    override def normalize(value: Double): Double = {
+      var v = value
+      while (v < 0.0) v += 180.0
+      while (v > 180.0) v -= 180.0
+      v
+    }
+  }
+
+  case class Cell(extents: Vector[Extent[_]] = Vector()) {
     val numDimensions: Int = extents.size
 
-    def contains(point: Vector[Dimension[_]]): Boolean = {
+    def contains(point: Vector[_]): Boolean = {
       if (point.size != numDimensions) return false
       extents.zip(point).forall {
         case (extent, coord) => extent.contains(coord)
@@ -156,10 +189,14 @@ object Dimensions {
     def +(that: Cell): Cell = Cell(extents ++ that.extents)
   }
 
+  implicit def hintsToGap(hintsOpt: Option[RangeComputeHints]): Long = {
+    hintsOpt.map(hints => hints.get(GapMergedIndexRange.HintsKeyMapGap)).getOrElse(0).toString.toLong
+  }
+
   trait SpaceFillingCurve extends Discretizor with RangeConsolidator {
     def children: Vector[Discretizor]
 
-    require(children != null && children.nonEmpty)
+    //require(children != null && children.nonEmpty)
 
     // how many possible values can the `index` method return?
     def cardinality: Long = children.map(_.cardinality).product
@@ -170,12 +207,13 @@ object Dimensions {
     // these routines are the heart of the SFC;
     // they will be made concrete per descendant curve
     def fold(subordinates: Seq[Long]): Long
-
     def unfold(index: Long): Vector[Long]
 
-    def getIndexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long]): Seq[IndexRange]
+    // ideally, this will emit qualifying index ranges in order, but that may not always
+    // be possible...
+    def getIndexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange]
 
-    def index(values: Seq[DimensionLike[_]]): Long = {
+    def index(values: Seq[Any]): Long = {
       require(values.size == arity)
 
       // defer to your children, be they SFCs or Dimensions
@@ -208,22 +246,41 @@ object Dimensions {
       cell
     }
 
-    def getQueryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    // queries ONLY a SINGLE rectangle, converting user-space ranges to index-space ranges recursively
+    // NB:  "maxGap" is passed through the (optional) RangeComputeHints
+    def queryRanges(extents: Seq[Option[Extent[_]]], hints: Option[RangeComputeHints] = None): Iterator[IndexRange] = {
       // assume that unqueried dimensions are either:
       // 1.  an option set to its full extent; or
       // 2.  a None
       require(extents.size == arity)
 
-      // defer to your children, be they SFCs or Dimensions
-      val subordinates: Seq[Seq[IndexRange]] = children.foldLeft((extents, Seq[Seq[IndexRange]]()))((acc, child) => acc match {
+      // extract the maximum allowable gap between ranges (defaults to zero)
+      val maxGap: Long = hints
+
+      // convert the per-dimension extents into (flat) index ranges per child
+      // (defer to your children for this work, be they SFCs or Dimensions)
+      val childIndexes: Seq[Seq[IndexRange]] = children.foldLeft((extents, Seq[Seq[IndexRange]]()))((acc, child) => acc match {
         case (extentsLeft: Seq[Option[Extent[_]]], subsSoFar: Seq[IndexRange]) =>
           val childExtents: Seq[Option[Extent[_]]] = extentsLeft.take(child.arity)
-          val childRanges: Seq[IndexRange] = child.getQueryRanges(childExtents)
+          val childRanges: Seq[IndexRange] = child.queryRanges(childExtents, hints).toSeq
           (extentsLeft.drop(child.arity), subsSoFar :+ childRanges)
       })._2
 
+      // it's possible that a single child's conversion of its user ranges returns multiple query ranges --
+      // think of R(Z(x, y), t) when presented with ([-10, 10], [0, 5], [now, now-5min]); the
+      // Z curve is discontinuous across the x- and y- box, returning at least two separate ranges --
+      // so plan across all combinations of child index ranges
+      val rectangleIterator: Iterator[Seq[IndexRange]] =
+        CartesianProductIterable(childIndexes).iterator.map(_.asInstanceOf[Seq[IndexRange]])
+      val rangesToConsolidate: Iterator[IndexRange] = rectangleIterator.flatMap(indexRangeSeq => {
+        val lowerCorner = indexRangeSeq.map(_.lower)
+        val upperCorner = indexRangeSeq.map(_.upper)
+        getIndexRanges(lowerCorner, upperCorner, hints)
+      })
+
       // roll up the child index-ranges into a single index-range
-      consolidateRanges(subordinates)
+      // TODO:  short-cut if there was only one rectangle; these ranges will already be in order
+      consolidateRanges(rangesToConsolidate, maxGap)
     }
 
   }

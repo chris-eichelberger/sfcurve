@@ -8,7 +8,8 @@
 
 package org.locationtech.sfcurve.hilbert
 
-import org.locationtech.sfcurve.SpaceFillingCurves
+import org.locationtech.sfcurve.Dimensions.{Latitude, Longitude}
+import org.locationtech.sfcurve.{GapMergedIndexRange, RangeComputeHints, SpaceFillingCurves}
 import org.scalatest._
 
 class HilbertCurveSpec extends FunSpec with Matchers {
@@ -27,22 +28,29 @@ class HilbertCurveSpec extends FunSpec with Matchers {
       val resolution = 16
       val gridCells = math.pow(2, resolution)
 
-      val sfc = new HilbertCurve2D(resolution)
-      val index: Long = sfc.toIndex(0.0, 0.0)
+      for (atX <- Seq(-180.0, -179.9999, -10, 0, 10, 179.9999, 180); atY <- Seq(-90, -89.9999, -10, 0, 10, 89.9999, 90)) {
+        val sfc = new HilbertCurve2D(resolution)
+        val index: Long = sfc.toIndex(atX, atY)
 
-      val xEpsilon = 360.0 / gridCells
-      val yEpsilon = 180.0 / gridCells
+        val point = sfc.toPoint(index)
 
-      val point = sfc.toPoint(index)
+        val dimLongitude = Longitude(gridCells.toLong)
+        val dimLatitude = Latitude(gridCells.toLong)
 
-      point._1 should be (-(xEpsilon / 2.0) +- 0.000001)
-      point._2 should be (-(yEpsilon / 2.0) +- 0.000001)      
+        dimLongitude.toExtent(dimLongitude.toBin(atX)).contains(point._1) should be(true)
+        dimLatitude.toExtent(dimLatitude.toBin(atY)).contains(point._2) should be(true)
+      }
     }
 
     it("implements a range query"){
 
       val sfc = new HilbertCurve2D(3)
-      val range = sfc.toRanges(-178.123456, -86.398493, 179.3211113, 87.393483)
+
+      // any gaps of only one index cell will be merged automatically
+      val hints = new RangeComputeHints
+      hints.put(GapMergedIndexRange.HintsKeyMapGap, 1L.asInstanceOf[AnyRef])
+
+      val range = sfc.toRanges(-178.123456, -86.398493, 179.3211113, 87.393483, Option(hints))
 
       range should have length 3
 

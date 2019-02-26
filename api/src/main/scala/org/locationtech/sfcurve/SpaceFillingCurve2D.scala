@@ -8,6 +8,8 @@
 
 package org.locationtech.sfcurve
 
+import org.locationtech.sfcurve.Dimensions.{Cell, Extent, Latitude, Longitude, NonNegativeLatitude, NonNegativeLongitude, SpaceFillingCurve}
+
 class RangeComputeHints extends java.util.HashMap[String, AnyRef]
 
 sealed trait IndexRange {
@@ -24,6 +26,38 @@ case class CoveredRange(lower: Long, upper: Long) extends IndexRange {
 
 case class OverlappingRange(lower: Long, upper: Long) extends IndexRange {
   val contained = false
+}
+
+case class GapMergedIndexRange(lower: Long, upper: Long, maxGap: Long) extends IndexRange {
+  // this is a degenerate method
+  // TODO figure out how to thread this value through, if needed
+  def contained: Boolean = false
+
+  override def toString(): String = s"GapMergedIndexRange([$lower, $upper], gap $maxGap)"
+
+  def contains(that: GapMergedIndexRange): Boolean =
+    (lower + maxGap) <= that.lower && (upper - maxGap) >= that.upper
+
+  // NB:  "overlaps" here means really "overlaps OR ABUTS"
+  def overlaps(that: GapMergedIndexRange): Boolean =
+    (lower - maxGap - 1) <= that.upper && (upper + maxGap + 1) >= that.lower
+
+  def disjoint(that: GapMergedIndexRange): Boolean = !overlaps(that)
+
+  def lt(that: GapMergedIndexRange): Boolean =
+    upper < (that.lower - maxGap)
+
+  def gt(that: GapMergedIndexRange): Boolean =
+    lower > (that.upper + maxGap)
+
+  def merge(that: GapMergedIndexRange): GapMergedIndexRange = {
+    if (disjoint(that)) println(s"WARN:  Merging not-overlapping GapMergedIndexRanges $this and $that at upper-gap $maxGap")
+    GapMergedIndexRange(Math.min(lower, that.lower), Math.max(upper, that.upper), maxGap)
+  }
+}
+
+object GapMergedIndexRange {
+  val HintsKeyMapGap: String = "MaximumAllowableGapBetweenQueryRanges"
 }
 
 object IndexRange {
@@ -44,8 +78,28 @@ object IndexRange {
     else          OverlappingRange(l, u)
 }
 
-trait SpaceFillingCurve2D {
-  def toIndex(x: Double, y: Double): Long
-  def toPoint(i: Long): (Double, Double)
-  def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange]
+abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve {
+  // we assume that the cardinality is specified in terms of the number of bits precision
+  val xDimension = Longitude(1L << bitsPrecision)
+  val yDimension = Latitude(1L << bitsPrecision)
+  val children = Vector(xDimension, yDimension)
+
+  @deprecated
+  def toIndex(x: Double, y: Double): Long = fold(Seq(xDimension.toBin(x), yDimension.toBin(y)))
+
+  @deprecated
+  def toPoint(i: Long): (Double, Double) = {
+    val cell = inverseIndex(i)
+    (
+      cell.extents.headOption.map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get,
+      cell.extents.lastOption.map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get
+      )
+  }
+
+  @deprecated
+  def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    val extXOpt = Option(Extent[Double](xmin, xmax))
+    val extYOpt = Option(Extent[Double](ymin, ymax))
+    queryRanges(Seq(extXOpt, extYOpt), hints).toSeq
+  }
 }
