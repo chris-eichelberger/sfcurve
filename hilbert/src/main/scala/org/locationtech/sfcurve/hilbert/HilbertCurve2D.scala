@@ -134,7 +134,7 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(resolution) wi
 //  }
 
   // TODO:  confirm that this returns index ranges in strictly ascending order
-  def getIndexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+  def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
     require(lowerCorner.size == 2)
     val minNormalizedLongitude = lowerCorner.head
     val minNormalizedLatitude = lowerCorner.last

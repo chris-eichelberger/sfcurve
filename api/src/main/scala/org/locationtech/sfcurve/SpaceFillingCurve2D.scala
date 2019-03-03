@@ -8,7 +8,7 @@
 
 package org.locationtech.sfcurve
 
-import org.locationtech.sfcurve.Dimensions.{Cell, Extent, Latitude, Longitude, NonNegativeLatitude, NonNegativeLongitude, SpaceFillingCurve}
+import org.locationtech.sfcurve.Dimensions.{Cell, Dimension, DimensionLike, Discretizor, Extent, Latitude, Longitude, NonNegativeLatitude, NonNegativeLongitude, SpaceFillingCurve}
 
 class RangeComputeHints extends java.util.HashMap[String, AnyRef]
 
@@ -78,25 +78,30 @@ object IndexRange {
     else          OverlappingRange(l, u)
 }
 
+/**
+  *
+  * @param bitsPrecision the number of bits to use PER DIMENSION to determine cardinality;
+  *                      curve_cardinality = num_dimensions * (1 << bitsPrecision)
+  */
 abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve {
   // we assume that the cardinality is specified in terms of the number of bits precision
   val xDimension = Longitude(1L << bitsPrecision)
   val yDimension = Latitude(1L << bitsPrecision)
-  val children = Vector(xDimension, yDimension)
+  val children: Vector[Discretizor] = Vector(xDimension, yDimension)
 
-  @deprecated
+  @deprecated("use 'index' instead", "SFCurve 2.0")
   def toIndex(x: Double, y: Double): Long = fold(Seq(xDimension.toBin(x), yDimension.toBin(y)))
 
-  @deprecated
+  @deprecated("use 'inverseIndex' instead", "SFCurve 2.0")
   def toPoint(i: Long): (Double, Double) = {
     val cell = inverseIndex(i)
     (
       cell.extents.headOption.map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get,
       cell.extents.lastOption.map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get
-      )
+    )
   }
 
-  @deprecated
+  @deprecated("use 'indexRanges' instead", "SFCurve 2.0")
   def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
     val extXOpt = Option(Extent[Double](xmin, xmax))
     val extYOpt = Option(Extent[Double](ymin, ymax))

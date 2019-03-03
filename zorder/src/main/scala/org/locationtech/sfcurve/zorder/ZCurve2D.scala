@@ -14,9 +14,14 @@ import scala.util.Try
 
 /** Represents a 2D Z order curve that we will use for benchmarking purposes in the early stages.
   *
+  * Assumes, because of the dependence on the ZN object to do the real range-query identification,
+  * that query ranges will already be returned in order without any additional post-processing.
+  *
   * @param    resolution     The number of cells in each dimension of the grid space that will be indexed.
   */
-class ZCurve2D(resolution: Int) extends SpaceFillingCurve2D {
+class ZCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bitsFromCardinality(resolution).toInt)
+  with IdentityRangeConsolidator {
+
   // We are assuming Lat Lng extent for the whole world
   val xmin = -180.0
   val ymin = -90.0
@@ -40,34 +45,39 @@ class ZCurve2D(resolution: Int) extends SpaceFillingCurve2D {
     math.min(math.max(ymax - (row * cellheight) - (cellheight / 2), ymin), ymax)
 
 
-  def toIndex(x: Double, y: Double): Long = {
-    val col = mapToCol(x)
-    val row = mapToRow(y)
-    Z2(col, row).z
+//  def toIndex(x: Double, y: Double): Long = {
+//    val col = mapToCol(x)
+//    val row = mapToRow(y)
+//    Z2(col, row).z
+//  }
+
+//  def toPoint(i: Long): (Double, Double) = {
+//    val (col, row) = new Z2(i).decode
+//    (colToMap(col), rowToMap(row))
+//  }
+
+//  def bound(i: Long): (Double, Double, Double, Double) = {
+//    val (col, row) = new Z2(i).decode
+//    val x = colToMap(col)
+//    val y = rowToMap(row)
+//    (validateX(x - cellwidth), validateY(y-cellheight), validateX(x+cellwidth), validateY(y+cellheight))
+//  }
+
+//  def validateX(x: Double) = math.min(math.max(xmin, x), xmax)
+//  def validateY(y: Double) = math.min(math.max(ymin, y), ymax)
+
+  override def fold(subordinates: Seq[Long]): Long = Z2(subordinates.head.toInt, subordinates.last.toInt).z
+
+  override def unfold(index: Long): Vector[Long] = {
+    val (ix, iy) = Z2(index).decode
+    Vector(ix, iy)
   }
 
-  def toPoint(i: Long): (Double, Double) = {
-    val (col, row) = new Z2(i).decode
-    (colToMap(col), rowToMap(row))
-  }
-
-  def bound(i: Long): (Double, Double, Double, Double) = {
-    val (col, row) = new Z2(i).decode
-    val x = colToMap(col)
-    val y = rowToMap(row)
-    (validateX(x - cellwidth), validateY(y-cellheight), validateX(x+cellwidth), validateY(y+cellheight))
-  }
-
-  def validateX(x: Double) = math.min(math.max(xmin, x), xmax)
-  def validateY(y: Double) = math.min(math.max(ymin, y), ymax)
-
-  def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
-    val colMin = mapToCol(xmin)
-    val rowMin = mapToRow(ymax)
-    val min = Z2(colMin, rowMin)
-    val colMax = mapToCol(xmax)
-    val rowMax = mapToRow(ymin)
-    val max = Z2(colMax, rowMax)
+  override def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints]): Seq[IndexRange] = {
+    require(lowerCorner.size == 2)
+    require(upperCorner.size == 2)
+    val min = Z2(lowerCorner.head.toInt, lowerCorner.last.toInt)
+    val max = Z2(upperCorner.head.toInt, upperCorner.last.toInt)
 
     val maxRecurse = for {
       hint    <- hints
@@ -79,6 +89,25 @@ class ZCurve2D(resolution: Int) extends SpaceFillingCurve2D {
 
     Z2.zranges(Array(ZRange(min, max)), maxRecurse = maxRecurse)
   }
+
+//  def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+//    val colMin = mapToCol(xmin)
+//    val rowMin = mapToRow(ymax)
+//    val min = Z2(colMin, rowMin)
+//    val colMax = mapToCol(xmax)
+//    val rowMax = mapToRow(ymin)
+//    val max = Z2(colMax, rowMax)
+//
+//    val maxRecurse = for {
+//      hint    <- hints
+//      recurse <- Option(hint.get(ZCurve2D.MAX_RECURSE))
+//      asInt   <- Try(recurse.asInstanceOf[Int]).toOption
+//    } yield {
+//      asInt
+//    }
+//
+//    Z2.zranges(Array(ZRange(min, max)), maxRecurse = maxRecurse)
+//  }
 }
 
 object ZCurve2D {

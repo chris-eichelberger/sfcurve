@@ -190,8 +190,14 @@ object Dimensions {
   }
 
   implicit def hintsToGap(hintsOpt: Option[RangeComputeHints]): Long = {
-    hintsOpt.map(hints => hints.get(GapMergedIndexRange.HintsKeyMapGap)).getOrElse(0).toString.toLong
+    if (hintsOpt == null) return 0
+    val hint = hintsOpt.map(hints => hints.get(GapMergedIndexRange.HintsKeyMapGap)).getOrElse(0)
+    if (hint == null) return 0
+    hint.toString.toLong
   }
+
+  def bitsFromCardinality(cardinality: Long): Long =
+    Math.ceil(Math.log(cardinality.toDouble) / Math.log(2.0)).toLong
 
   trait SpaceFillingCurve extends Discretizor with RangeConsolidator {
     def children: Vector[Discretizor]
@@ -211,7 +217,7 @@ object Dimensions {
 
     // ideally, this will emit qualifying index ranges in order, but that may not always
     // be possible...
-    def getIndexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange]
+    def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange]
 
     def index(values: Seq[Any]): Long = {
       require(values.size == arity)
@@ -275,7 +281,7 @@ object Dimensions {
       val rangesToConsolidate: Iterator[IndexRange] = rectangleIterator.flatMap(indexRangeSeq => {
         val lowerCorner = indexRangeSeq.map(_.lower)
         val upperCorner = indexRangeSeq.map(_.upper)
-        getIndexRanges(lowerCorner, upperCorner, hints)
+        indexRanges(lowerCorner, upperCorner, hints)
       })
 
       // roll up the child index-ranges into a single index-range

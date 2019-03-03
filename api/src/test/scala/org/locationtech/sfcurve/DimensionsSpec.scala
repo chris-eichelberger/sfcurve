@@ -154,7 +154,7 @@ class DimensionsSpec extends FunSpec with Matchers {
       }
 
       // this is a dumb implementation, because it's just for testing and needn't be efficient
-      def getIndexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+      def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
         require(lowerCorner.size == arity)
         require(upperCorner.size == arity)
 
