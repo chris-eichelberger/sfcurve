@@ -1,5 +1,7 @@
 package org.locationtech.sfcurve.zorder
 
+import java.io.{FileWriter, PrintWriter}
+
 import org.locationtech.sfcurve.Dimensions.{Cell, Extent, Latitude, Longitude}
 
 /**
@@ -75,9 +77,30 @@ object TriN {
 
   def getXT(x: Double, y: Double, X: Extent[Double]): Double = {
     val dx = X.max - X.min
-    val dxT = Math.cos(Math.toRadians(y))
-    val pX0 = x / dx
-    (dx - 0.5 * dxT) + dxT * pX0
+    val dxT = Math.toDegrees(Math.cos(Math.toRadians(y)))
+    val xMid = X.min + 0.5 * dx
+    val xT = xMid - dxT * (xMid - x) / dx
+    println(f"getXT($x%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
+    println(f"  dx $dx%1.4f")
+    println(f"  xMid $xMid%1.4f")
+    println(f"  dxT $dxT%1.4f")
+    println(f"  xMid - xT")
+    println(f"  xT $xT%1.4f")
+    xT
+  }
+
+  def getXTInv(xT: Double, y: Double, X: Extent[Double]): Double = {
+    val dx = X.max - X.min
+    val dxT = Math.toDegrees(Math.cos(Math.toRadians(y)))
+    val xMid = X.min + 0.5 * dx
+    val x = xMid - dx * (xMid - xT) / dxT
+//    println(f"getXTInv($xT%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
+//    println(f"  dx $dx%1.4f")
+//    println(f"  xMid $xMid%1.4f")
+//    println(f"  dxT $dxT%1.4f")
+//    println(f"  xMid - xT")
+//    println(f"  x $x%1.4f")
+    x
   }
 
   def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
@@ -104,13 +127,54 @@ class TriN {
 }
 
 object TriTest extends App {
-  def testInitialTri(x: Double, y: Double): Unit = {
+  var pw: PrintWriter = null
+
+  def testInitialTri(n: Int, x: Double, y: Double): Unit = {
     val t = getTriangle(x, y, 1)
     val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
-    println(f"POINT($x%1.4f, $y%1.4f) -> T $bIndex%s")
+    val xT = getXT(x, y, t.X)
+    println(f"  x' $xT%1.4f")
+    val x2 = getXTInv(xT, y, t.X)
+    println(f"  x2 $x2%1.4f")
+    pw.println(f"$n%d\tPOINT($x%1.4f $y%1.4f)\tPOINT($xT%1.4f $y%1.4f)\t$bIndex%s")
+    require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
   }
 
-  testInitialTri(45.0, 45.0)
-  testInitialTri(0.0, 0.0)
-  testInitialTri(45.0, -45.0)
+  try {
+    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
+    pw.println("index\twkt")
+    for (row <- 0 to 1; col <- 0 to 3) {
+      val x0 = -180.0 + 90.0 * col
+      val y0 = -90.0 + 90.0 * row
+      val x1 = x0 + 90.0 - 1e-6
+      val y1 = y0 + 90.0 - 1e-6
+      val xMid = 0.5 * (x0 + x1)
+      val yMid = 0.5 * (x0 + x1)
+      val index = getInitialTriangle(xMid, yMid).index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
+      if (row == 0) {
+        pw.println(s"$index\tPOLYGON(($x0 $y1, $xMid $y0, $x1 $y1, $x0 $y1))")
+      } else {
+        pw.println(s"$index\tPOLYGON(($x0 $y0, $xMid $y1, $x1 $y0, $x0 $y0))")
+      }
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test.txt"))
+    pw.println("label\torig_wkt\ttri_wkt\tindex")
+    val xs = (-179.9 until 179.9 by 22.5).zipWithIndex
+    val ys = (0.0 to 0.0 by 22.5).zipWithIndex
+    val ny = ys.length
+    for (xx <- xs; yy <- ys) {
+      testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
+    }
+//    testInitialTri(1, 45.0, 45.0)
+//    testInitialTri(2, 0.0, 0.0)
+//    testInitialTri(3, 45.0, -45.0)
+//    testInitialTri(4, -180.0, -45.0)
+//    testInitialTri(5, 179.9999, 45.0)
+//    testInitialTri(6, 0.0, 89.9999)
+//    testInitialTri(7, -78.4767, 38.0293)
+  } finally {
+    pw.close()
+  }
 }

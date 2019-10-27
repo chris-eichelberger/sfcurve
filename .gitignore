@@ -35,3 +35,5 @@ project/target
 *.swo
 *.sublime-*
 .vagrant
+
+**/test*.txt
