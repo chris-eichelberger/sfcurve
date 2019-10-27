@@ -77,27 +77,27 @@ object TriN {
 
   def getXT(x: Double, y: Double, X: Extent[Double]): Double = {
     val dx = X.max - X.min
-    val dxT = Math.toDegrees(Math.cos(Math.toRadians(y)))
+    val pY = (90.0 - Math.abs(y)) / 90.0
     val xMid = X.min + 0.5 * dx
-    val xT = xMid - dxT * (xMid - x) / dx
-    println(f"getXT($x%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
-    println(f"  dx $dx%1.4f")
-    println(f"  xMid $xMid%1.4f")
-    println(f"  dxT $dxT%1.4f")
-    println(f"  xMid - xT")
-    println(f"  xT $xT%1.4f")
+    val xT = xMid - pY * (xMid - x)
+//    println(f"getXT($x%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
+//    println(f"  dx $dx%1.4f")
+//    println(f"  xMid $xMid%1.4f")
+//    println(f"  pY $pY%1.4f")
+//    println(f"  xMid - xT")
+//    println(f"  xT $xT%1.4f")
     xT
   }
 
   def getXTInv(xT: Double, y: Double, X: Extent[Double]): Double = {
     val dx = X.max - X.min
-    val dxT = Math.toDegrees(Math.cos(Math.toRadians(y)))
+    val pY = (90.0 - Math.abs(y)) / 90.0
     val xMid = X.min + 0.5 * dx
-    val x = xMid - dx * (xMid - xT) / dxT
+    val x = if (pY > 1e-6) xMid - (xMid - xT) / pY else xT
 //    println(f"getXTInv($xT%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
 //    println(f"  dx $dx%1.4f")
 //    println(f"  xMid $xMid%1.4f")
-//    println(f"  dxT $dxT%1.4f")
+//    println(f"  pY $pY%1.4f")
 //    println(f"  xMid - xT")
 //    println(f"  x $x%1.4f")
     x
@@ -133,9 +133,9 @@ object TriTest extends App {
     val t = getTriangle(x, y, 1)
     val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
     val xT = getXT(x, y, t.X)
-    println(f"  x' $xT%1.4f")
+//    println(f"  x' $xT%1.4f")
     val x2 = getXTInv(xT, y, t.X)
-    println(f"  x2 $x2%1.4f")
+//    println(f"  x2 $x2%1.4f")
     pw.println(f"$n%d\tPOINT($x%1.4f $y%1.4f)\tPOINT($xT%1.4f $y%1.4f)\t$bIndex%s")
     require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
   }
@@ -161,8 +161,8 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test.txt"))
     pw.println("label\torig_wkt\ttri_wkt\tindex")
-    val xs = (-179.9 until 179.9 by 22.5).zipWithIndex
-    val ys = (0.0 to 0.0 by 22.5).zipWithIndex
+    val xs = (-179.999 to 179.999 by 22.5).zipWithIndex
+    val ys = (-89.999 to 89.999 by 11.25*0.5).zipWithIndex
     val ny = ys.length
     for (xx <- xs; yy <- ys) {
       testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
