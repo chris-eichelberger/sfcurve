@@ -126,6 +126,70 @@ object TriN {
   val AC_B = 9
   val BA_C = 10
   val CB_A = 11
+  
+  def H(orientation: Int): Int = orientation match {
+    case A_BC => A_CB
+    case B_CA => B_AC
+    case C_AB => C_BA
+    case A_CB => A_BC
+    case B_AC => B_CA
+    case C_BA => C_AB
+    case AB_C => BA_C
+    case BC_A => CB_A
+    case CA_B => AC_B
+    case AC_B => CA_B
+    case BA_C => AB_C
+    case CB_A => BC_A
+    case _ => throw new Exception(s"Invalid orientation ($orientation)")
+  }
+
+  def V(orientation: Int): Int = orientation match {
+    case A_BC => BC_A
+    case B_CA => CA_B
+    case C_AB => AB_C
+    case A_CB => CB_A
+    case B_AC => AC_B
+    case C_BA => BA_C
+    case AB_C => C_AB
+    case BC_A => A_BC
+    case CA_B => B_CA
+    case AC_B => B_AC
+    case BA_C => C_BA
+    case CB_A => A_CB
+    case _ => throw new Exception(s"Invalid orientation ($orientation)")
+  }
+
+  def CCW(orientation: Int): Int = orientation match {
+    case A_BC => AB_C
+    case B_CA => BC_A
+    case C_AB => CA_B
+    case A_CB => AC_B
+    case B_AC => BA_C
+    case C_BA => CB_A
+    case AB_C => B_CA
+    case BC_A => C_AB
+    case CA_B => A_BC
+    case AC_B => C_BA
+    case BA_C => A_CB
+    case CB_A => B_AC
+    case _ => throw new Exception(s"Invalid orientation ($orientation)")
+  }
+
+  def CW(orientation: Int): Int = orientation match {
+    case A_BC => CA_B
+    case B_CA => AB_C
+    case C_AB => BC_A
+    case A_CB => BA_C
+    case B_AC => CB_A
+    case C_BA => AC_B
+    case AB_C => A_BC
+    case BC_A => B_CA
+    case CA_B => C_AB
+    case AC_B => A_CB
+    case BA_C => B_AC
+    case CB_A => C_BA
+    case _ => throw new Exception(s"Invalid orientation ($orientation)")
+  }
 
   val OrientationTransitions: Map[Int, Map[Int, Int]] = Map(
     A_BC -> Map(
@@ -332,4 +396,60 @@ object TriTest extends App {
   } finally {
     pw.close()
   }
+  
+  // H must be invertible
+  assert(A_BC == H(H(A_BC)), s"Uninvertible:  A_BC <> H(H(A_BC))")
+  assert(B_CA == H(H(B_CA)), s"Uninvertible:  B_CA <> H(H(B_CA))")
+  assert(C_AB == H(H(C_AB)), s"Uninvertible:  C_AB <> H(H(C_AB))")
+  assert(A_CB == H(H(A_CB)), s"Uninvertible:  A_CB <> H(H(A_CB))")
+  assert(B_AC == H(H(B_AC)), s"Uninvertible:  B_AC <> H(H(B_AC))")
+  assert(C_BA == H(H(C_BA)), s"Uninvertible:  C_BA <> H(H(C_BA))")
+  assert(AB_C == H(H(AB_C)), s"Uninvertible:  AB_C <> H(H(AB_C))")
+  assert(BC_A == H(H(BC_A)), s"Uninvertible:  BC_A <> H(H(BC_A))")
+  assert(CA_B == H(H(CA_B)), s"Uninvertible:  CA_B <> H(H(CA_B))")
+  assert(AC_B == H(H(AC_B)), s"Uninvertible:  AC_B <> H(H(AC_B))")
+  assert(BA_C == H(H(BA_C)), s"Uninvertible:  BA_C <> H(H(BA_C))")
+  assert(CB_A == H(H(CB_A)), s"Uninvertible:  CB_A <> H(H(CB_A))")
+
+  // V must be invertible
+  assert(A_BC == V(V(A_BC)), s"Uninvertible:  A_BC <> V(V(A_BC))")
+  assert(B_CA == V(V(B_CA)), s"Uninvertible:  B_CA <> V(V(B_CA))")
+  assert(C_AB == V(V(C_AB)), s"Uninvertible:  C_AB <> V(V(C_AB))")
+  assert(A_CB == V(V(A_CB)), s"Uninvertible:  A_CB <> V(V(A_CB))")
+  assert(B_AC == V(V(B_AC)), s"Uninvertible:  B_AC <> V(V(B_AC))")
+  assert(C_BA == V(V(C_BA)), s"Uninvertible:  C_BA <> V(V(C_BA))")
+  assert(AB_C == V(V(AB_C)), s"Uninvertible:  AB_C <> V(V(AB_C))")
+  assert(BC_A == V(V(BC_A)), s"Uninvertible:  BC_A <> V(V(BC_A))")
+  assert(CA_B == V(V(CA_B)), s"Uninvertible:  CA_B <> V(V(CA_B))")
+  assert(AC_B == V(V(AC_B)), s"Uninvertible:  AC_B <> V(V(AC_B))")
+  assert(BA_C == V(V(BA_C)), s"Uninvertible:  BA_C <> V(V(BA_C))")
+  assert(CB_A == V(V(CB_A)), s"Uninvertible:  CB_A <> V(V(CB_A))")
+
+  // CCW must go all the way around
+  assert(A_BC == CCW(CCW(CCW(CCW(CCW(CCW(A_BC)))))), s"Uninvertible:  A_BC <> CCW(CCW(CCW(CCW(CCW(CCW(A_BC))))))")
+  assert(B_CA == CCW(CCW(CCW(CCW(CCW(CCW(B_CA)))))), s"Uninvertible:  B_CA <> CCW(CCW(CCW(CCW(CCW(CCW(B_CA))))))")
+  assert(C_AB == CCW(CCW(CCW(CCW(CCW(CCW(C_AB)))))), s"Uninvertible:  C_AB <> CCW(CCW(CCW(CCW(CCW(CCW(C_AB))))))")
+  assert(A_CB == CCW(CCW(CCW(CCW(CCW(CCW(A_CB)))))), s"Uninvertible:  A_CB <> CCW(CCW(CCW(CCW(CCW(CCW(A_CB))))))")
+  assert(B_AC == CCW(CCW(CCW(CCW(CCW(CCW(B_AC)))))), s"Uninvertible:  B_AC <> CCW(CCW(CCW(CCW(CCW(CCW(B_AC))))))")
+  assert(C_BA == CCW(CCW(CCW(CCW(CCW(CCW(C_BA)))))), s"Uninvertible:  C_BA <> CCW(CCW(CCW(CCW(CCW(CCW(C_BA))))))")
+  assert(AB_C == CCW(CCW(CCW(CCW(CCW(CCW(AB_C)))))), s"Uninvertible:  AB_C <> CCW(CCW(CCW(CCW(CCW(CCW(AB_C))))))")
+  assert(BC_A == CCW(CCW(CCW(CCW(CCW(CCW(BC_A)))))), s"Uninvertible:  BC_A <> CCW(CCW(CCW(CCW(CCW(CCW(BC_A))))))")
+  assert(CA_B == CCW(CCW(CCW(CCW(CCW(CCW(CA_B)))))), s"Uninvertible:  CA_B <> CCW(CCW(CCW(CCW(CCW(CCW(CA_B))))))")
+  assert(AC_B == CCW(CCW(CCW(CCW(CCW(CCW(AC_B)))))), s"Uninvertible:  AC_B <> CCW(CCW(CCW(CCW(CCW(CCW(AC_B))))))")
+  assert(BA_C == CCW(CCW(CCW(CCW(CCW(CCW(BA_C)))))), s"Uninvertible:  BA_C <> CCW(CCW(CCW(CCW(CCW(CCW(BA_C))))))")
+  assert(CB_A == CCW(CCW(CCW(CCW(CCW(CCW(CB_A)))))), s"Uninvertible:  CB_A <> CCW(CCW(CCW(CCW(CCW(CCW(CB_A))))))")
+
+  // CW must go all the way around
+  assert(A_BC == CW(CW(CW(CW(CW(CW(A_BC)))))), s"Uninvertible:  A_BC <> CW(CW(CW(CW(CW(CW(A_BC))))))")
+  assert(B_CA == CW(CW(CW(CW(CW(CW(B_CA)))))), s"Uninvertible:  B_CA <> CW(CW(CW(CW(CW(CW(B_CA))))))")
+  assert(C_AB == CW(CW(CW(CW(CW(CW(C_AB)))))), s"Uninvertible:  C_AB <> CW(CW(CW(CW(CW(CW(C_AB))))))")
+  assert(A_CB == CW(CW(CW(CW(CW(CW(A_CB)))))), s"Uninvertible:  A_CB <> CW(CW(CW(CW(CW(CW(A_CB))))))")
+  assert(B_AC == CW(CW(CW(CW(CW(CW(B_AC)))))), s"Uninvertible:  B_AC <> CW(CW(CW(CW(CW(CW(B_AC))))))")
+  assert(C_BA == CW(CW(CW(CW(CW(CW(C_BA)))))), s"Uninvertible:  C_BA <> CW(CW(CW(CW(CW(CW(C_BA))))))")
+  assert(AB_C == CW(CW(CW(CW(CW(CW(AB_C)))))), s"Uninvertible:  AB_C <> CW(CW(CW(CW(CW(CW(AB_C))))))")
+  assert(BC_A == CW(CW(CW(CW(CW(CW(BC_A)))))), s"Uninvertible:  BC_A <> CW(CW(CW(CW(CW(CW(BC_A))))))")
+  assert(CA_B == CW(CW(CW(CW(CW(CW(CA_B)))))), s"Uninvertible:  CA_B <> CW(CW(CW(CW(CW(CW(CA_B))))))")
+  assert(AC_B == CW(CW(CW(CW(CW(CW(AC_B)))))), s"Uninvertible:  AC_B <> CW(CW(CW(CW(CW(CW(AC_B))))))")
+  assert(BA_C == CW(CW(CW(CW(CW(CW(BA_C)))))), s"Uninvertible:  BA_C <> CW(CW(CW(CW(CW(CW(BA_C))))))")
+  assert(CB_A == CW(CW(CW(CW(CW(CW(CB_A)))))), s"Uninvertible:  CB_A <> CW(CW(CW(CW(CW(CW(CB_A))))))")
 }
