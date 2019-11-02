@@ -3,6 +3,7 @@ package org.locationtech.sfcurve.zorder
 import java.io.{FileWriter, PrintWriter}
 
 import org.locationtech.sfcurve.Dimensions.{Cell, Extent, Latitude, Longitude}
+import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 /**
   * Definition of triangle shapes / orientations:
@@ -33,14 +34,9 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   def bitString: String = index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
 
-  def isApexUp: Boolean = orientation match {
-    case 0 | 1 | 2 | 3 | 4 | 5 => true
-    case _ => false
-  }
-
   def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 0x111)
 
-  def nextOrientation(nextIndex: Int): Int = OrientationTransitions(orientation)(nextIndex)
+  def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
   def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
     if (maxDepth < 1) return this
@@ -56,7 +52,7 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     val dy = y1 - y0
     val yMid = y0 + 0.50 * dy
 
-    if (isApexUp) {
+    if (isApexUp(orientation)) {
       // top
       if (y > yMid) {
         return Triangle(stackIndex(IndexTop), nextOrientation(IndexTop), Extent(x14, x34), Extent(yMid, Y.max), depth + 1).getTriangle(x, y, maxDepth - 1)
@@ -126,7 +122,27 @@ object TriN {
   val AC_B = 9
   val BA_C = 10
   val CB_A = 11
-  
+
+  val Orientations: Set[Int] = Set(
+    A_BC, B_CA, C_AB, A_CB, B_AC, C_BA,
+    AB_C, BC_A, CA_B, AC_B, BA_C, CB_A
+  )
+
+  val TransCenter = 0
+  val TransApex = 1
+  val TransLR = 2
+  val TransLL = 4
+
+  val Transitions: Set[Int] = Set(TransCenter, TransApex, TransLR, TransLL)
+
+  def isValidOrientation(orientation: Int): Boolean = Orientations.contains(orientation)
+
+  def isApexUp(orientation: Int): Boolean = orientation match {
+    case A_BC | B_CA | C_AB | A_CB | B_AC | C_BA => true
+    case AB_C | BC_A | CA_B | AC_B | BA_C | CB_A => false
+    case _ => throw new Exception(s"Invalid orientation ($orientation)")
+  }
+
   def H(orientation: Int): Int = orientation match {
     case A_BC => A_CB
     case B_CA => B_AC
@@ -191,81 +207,19 @@ object TriN {
     case _ => throw new Exception(s"Invalid orientation ($orientation)")
   }
 
-  val OrientationTransitions: Map[Int, Map[Int, Int]] = Map(
-    A_BC -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    // TODO:  the following are UNVETTED!
-    B_CA -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    C_AB -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    A_CB -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    B_AC -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    C_BA -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    AB_C -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    BC_A -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    CA_B -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    AC_B -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    BA_C -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    ),
-    CB_A -> Map(
-      IndexTop -> A_CB,
-      IndexLL -> B_AC,
-      IndexLR -> C_BA,
-      IndexCenter -> BC_A
-    )
-  )
+  val OrientationTransitions: Map[(Int, Int), Int] = {
+    val orientationTransitionsItr = CartesianProductIterable(Seq(Orientations.toSeq, Transitions.toSeq))
+    orientationTransitionsItr.map {
+      case Seq(orientation, transition) =>
+        transition match {
+          case TransApex => (orientation.asInstanceOf[Int], transition.asInstanceOf[Int]) -> H(orientation.asInstanceOf[Int])
+          case TransCenter => (orientation.asInstanceOf[Int], transition.asInstanceOf[Int]) -> V(H(orientation.asInstanceOf[Int]))
+          case TransLR => (orientation.asInstanceOf[Int], transition.asInstanceOf[Int]) -> CCW(CCW(H(orientation.asInstanceOf[Int])))
+          case TransLL => (orientation.asInstanceOf[Int], transition.asInstanceOf[Int]) -> CW(CW(H(orientation.asInstanceOf[Int])))
+          case _ => throw new Exception(s"Invalid transition in pair ($orientation, $transition)")
+        }
+    }.toMap
+  }
 
   // map the given (x, y) coordinate to one face of the octahedron
   // that wraps the entire (spherical) Earth
