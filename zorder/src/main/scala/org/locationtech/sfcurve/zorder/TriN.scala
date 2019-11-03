@@ -30,37 +30,42 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 import TriN._
 
 case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[Double], depth: Int) {
-  val xMid: Double = 0.5 * (X.min + X.max)
+  val x0: Double = X.min
+  val x1: Double = X.max
+  val xMid: Double = 0.5 * (x0 + x1)
+  val x14: Double = 0.75 * x0 + 0.25 * x1
+  val x34: Double = 0.25 * x0 + 0.75 * x1
+  val (y0: Double, y1: Double, mLeftInv: Double, mRightInv: Double) = if (isApexUp(orientation)) {
+    (Y.min, Y.max, MNegInv, MPosInv)
+  } else {
+    (Y.max, Y.min, MPosInv, MNegInv)
+  }
+  val yMid: Double = 0.5 * (y0 + y1)
 
   def bitString: String = index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
 
-  def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 0x111)
+  def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 3)
 
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
+
+  def child(transition: Int): Triangle = transition match {
+    case TransCenter => Triangle(stackIndex(TransCenter), nextOrientation(TransCenter), Extent(x14, x34), makeExtent(y0, yMid), depth + 1)
+    case TransApex =>   Triangle(stackIndex(TransApex), nextOrientation(TransApex), Extent(x14, x34), makeExtent(yMid, y1), depth + 1)
+    case TransLL =>     Triangle(stackIndex(TransLL), nextOrientation(TransLL), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1)
+    case TransLR =>     Triangle(stackIndex(TransLR), nextOrientation(TransLR), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1)
+    case _ =>           throw new Exception(s"Invalid transition $transition")
+  }
 
   def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
     require(X.contains(x), s"X is out of bounds:  $x notIn $X")
     require(Y.contains(y), s"Y is out of bounds:  $y notIn $Y")
 
     if (maxDepth < 1) return this
-    
-    val x0 = X.min
-    val x1 = X.max
-    val dx = x1 - x0
-    val x14 = x0 + 0.25 * dx
-    val x34 = x0 + 0.75 * dx
-
-    val (y0: Double, y1: Double, mLeftInv: Double, mRightInv: Double) = if (isApexUp(orientation)) {
-      (Y.min, Y.max, MNegInv, MPosInv)
-    } else {
-      (Y.max, Y.min, MPosInv, MNegInv)
-    }
-    val yMid = 0.5 * (y0 + y1)
 
     // apex
     if (Math.abs(y - y1) < Math.abs(y - y0)) {
       require(x >= x14 && x <= x34, s"Cannot recurse into apex, X $x is out of range ($x14, $x34)")
-      return Triangle(stackIndex(TransApex), OrientationTransitions((orientation, TransApex)), Extent(x14, x34), makeExtent(yMid, y1), depth + 1).getTriangle(x, y, maxDepth - 1)
+      return child(TransApex).getTriangle(x, y, maxDepth - 1)
     }
 
     // you know you're recursing into the base
@@ -68,29 +73,37 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     // check left and right
     if (x < xMid) {
       // check left
+      if (x < x14) {
+        return child(TransLL).getTriangle(x, y, maxDepth - 1)
+      }
       val xProbe: Double = mLeftInv * (y - y0) + xMid
-      if (xProbe > x0 && xProbe < xMid && x < xProbe) {
-        return Triangle(stackIndex(TransLL), OrientationTransitions((orientation, TransLL)), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
+      if (xProbe >= x0 && xProbe < xMid && x < xProbe) {
+        return child(TransLL).getTriangle(x, y, maxDepth - 1)
       }
     } else {
       // check right
+      if (x > x34) {
+        return child(TransLR).getTriangle(x, y, maxDepth - 1)
+      }
       val xProbe: Double = mRightInv * (y - y0) + xMid
       if (xProbe >= xMid && xProbe <= x1 && x >= xProbe) {
-        return Triangle(stackIndex(TransLR), OrientationTransitions((orientation, TransLR)), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
+        return child(TransLR).getTriangle(x, y, maxDepth - 1)
       }
     }
 
     // if you get this far, recurse center
-    return Triangle(stackIndex(TransCenter), OrientationTransitions((orientation, TransCenter)), Extent(x14, x34), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
+    child(TransCenter).getTriangle(x, y, maxDepth - 1)
   }
 
   def polygonPoints: String = orientation match {
-    case 0 | 1 | 2 | 3 | 4 | 5 =>
+    case A_BC | A_CB | B_AC | B_CA | C_AB | C_BA =>
       // apex on top
       s"${xMid} ${Y.max}, ${X.max} ${Y.min}, ${X.min} ${Y.min}, ${xMid} ${Y.max}"
-    case _ =>
+    case AB_C | AC_B | BA_C | BC_A | CA_B | CB_A =>
       // apex on bottom
       s"${X.min} ${Y.max}, ${X.max} ${Y.max}, ${xMid} ${Y.min}, ${X.min} ${Y.max}"
+    case _ =>
+      throw new Exception(s"Invalid orientation $orientation")
   }
 
   def wkt: String = {
@@ -99,14 +112,8 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 }
 
 object TriN {
-  val Sqrt3: Double = Math.sqrt(3.0)
   val TriTopLongitude = Longitude(4)
   val TriTopLatitude = Latitude(2)
-
-  val IndexTop = 1
-  val IndexCenter = 0
-  val IndexLL = 4
-  val IndexLR = 2
 
   // possible triangle orientations...
   // apex up
@@ -231,17 +238,23 @@ object TriN {
     }.toMap
   }
 
-  // map the given (x, y) coordinate to one face of the octahedron
-  // that wraps the entire (spherical) Earth
-  def getInitialTriangle(x: Double, y: Double): Triangle = {
-    val ix = TriTopLongitude.index(Seq(x))
-    val iy = TriTopLatitude.index(Seq(y))
-    val orientation: Int = (iy & 1, ix & 1) match {
+  def topOrientation(ix: Int, iy: Int): Int = {
+    require(ix >= 0 && ix < 4)
+    require(iy >= 0 && iy < 2)
+    (iy & 1, ix & 1) match {
       case (0, 0) => 11
       case (0, 1) => 7
       case (1, 0) => 0
       case (1, 1) => 3
     }
+  }
+
+  // map the given (x, y) coordinate to one face of the octahedron
+  // that wraps the entire (spherical) Earth
+  def getInitialTriangle(x: Double, y: Double): Triangle = {
+    val ix = TriTopLongitude.index(Seq(x))
+    val iy = TriTopLatitude.index(Seq(y))
+    val orientation: Int = topOrientation(ix.toInt, iy.toInt)
     val idx: Long = (iy << 2) | (if (ix < 2) ix else 5 - ix)
     val x0: Double = -180.0 + 90.0 * ix
     val y0: Double = -90.0 + 90.0 * iy
@@ -280,9 +293,21 @@ object TriN {
     getTriangle(x, y, maxDepth).index
   }
 
-  def invIndex(idx: Long): Triangle = {
-    // TODO!
-    null
+  def invIndex(idx: Long, depth: Int): Triangle = {
+    require(depth > 0, s"Depth ($depth) must be at least 1")
+
+    val octIdx = (idx >> (3 * (depth - 1))) & 7
+    val octIdxX = octIdx & 3
+    val octXi = if (octIdxX < 2) octIdxX else 5 - octIdxX
+    val octYi = (octIdx >> 2) & 1
+    val x0 = octXi * 90.0
+    val y0 = octYi * 90.0
+    val t0: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
+
+    (depth - 2  to 0 by -1).foldLeft(t0)((acc, i) => {
+      val triad = (idx >> (3 * i)) & 7
+      acc.child(triad.toInt)
+    })
   }
 }
 
@@ -303,11 +328,15 @@ object NamedLocations {
     "Cabo San Lucas" -> LatLon(22.889986, -109.918799),
     "Hanga Roa" -> LatLon(-27.139735, -109.427335),
     "Gisborne" -> LatLon(-38.670242, 178.026712),
-    "Probe1" -> LatLon(-89.0, -179.0)
+    "South Pole" -> LatLon(-90.0, -179.0),
+    "North Pole" -> LatLon(90.0 - 1e-10, 179.0),
+    "Null Island" -> LatLon(0.0, 0.0)
   )
 }
 
 object TriTest extends App {
+  import NamedLocations._
+
   var pw: PrintWriter = null
 
   // H must be invertible
@@ -394,6 +423,18 @@ object TriTest extends App {
   assert(BA_C == CCW(CW(BA_C)), s"Uninvertible:  BA_C <> CCW(CW(BA_C))")
   assert(CB_A == CCW(CW(CB_A)), s"Uninvertible:  CB_A <> CCW(CW(CB_A))")
 
+  // index and inverse-index must be -- wait for it... -- inverses
+  for (depth <- 1 to 21; loc <- LocationsByName) {
+    loc match {
+      case (name, LatLon(y, x)) =>
+        val tFwd = getTriangle(x, y, depth)
+        val idx = index(x, y, depth)
+        assert(tFwd.index == idx, s"Mismatched indexes; triangle ${tFwd.index}, direct $idx")
+        val tRev = invIndex(idx, depth)
+        assert(tRev.index == idx, s"Mismatched reverse indexes; triangle ${tRev.index}, direct $idx")
+    }
+  }
+
   def testInitialTri(n: Int, x: Double, y: Double): Unit = {
     val t = getTriangle(x, y, 1)
     val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
@@ -406,8 +447,6 @@ object TriTest extends App {
   }
 
   try {
-    import NamedLocations._
-
     pw = new PrintWriter(new FileWriter("test-points.txt"))
     pw.println("name\torig_wkt\toct_wkt")
     LocationsByName.foreach {
@@ -447,7 +486,7 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test-index.txt"))
     pw.println("depth\tindex_dec\tindex_bits\twkt")
-    val target: LatLon = LocationsByName("Gisborne")
+    val target: LatLon = LocationsByName("Eichelberger")
     (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target.longitude, target.latitude, depth)
