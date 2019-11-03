@@ -294,7 +294,16 @@ object NamedLocations {
     "Uluru" -> LatLon(-25.344407, 131.036881),
     "Ipanema" -> LatLon(-22.986877, -43.208614),
     "Bogata" -> LatLon(4.592899, -74.123853),
-    "Ravensburg" ->LatLon(47.776487, 9.610370)
+    "Ravensburg" -> LatLon(47.776487, 9.610370),
+    "McMurdo" -> LatLon(-77.840380, 166.685197),
+    "Kilauea" -> LatLon(19.407757, -155.283448),
+    "Reunion" -> LatLon(-21.097563, 55.480176),
+    "Fukuoka" -> LatLon(33.593343, 130.351508),
+    "Beijing" -> LatLon(39.908780, 116.397482),
+    "Cabo San Lucas" -> LatLon(22.889986, -109.918799),
+    "Hanga Roa" -> LatLon(-27.139735, -109.427335),
+    "Gisborne" -> LatLon(-38.670242, 178.026712),
+    "Probe1" -> LatLon(-89.0, -179.0)
   )
 }
 
@@ -438,7 +447,7 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test-index.txt"))
     pw.println("depth\tindex_dec\tindex_bits\twkt")
-    val target: LatLon = LocationsByName("Eichelberger")
+    val target: LatLon = LocationsByName("Gisborne")
     (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target.longitude, target.latitude, depth)
