@@ -39,6 +39,11 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
   def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
+    println(s"$this:  getTriangle($x, $y, $maxDepth)...")
+
+    require(X.contains(x), s"X is out of bounds:  $x notIn $X")
+    require(Y.contains(y), s"Y is out of bounds:  $y notIn $Y")
+
     if (maxDepth < 1) return this
     
     val x0 = X.min
@@ -47,40 +52,52 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     val x14 = x0 + 0.25 * dx
     val x34 = x0 + 0.75 * dx
 
-    val y0 = Y.min
-    val y1 = Y.max
-    val dy = y1 - y0
+    val (y0: Double, y1: Double, mLeftInv: Double, mRightInv: Double) = if (isApexUp(orientation)) {
+      (Y.min, Y.max, MNegInv, MPosInv)
+    } else {
+      (Y.max, Y.min, MPosInv, MNegInv)
+    }
+    val dy = Math.abs(y1 - y0)
     val yMid = y0 + 0.50 * dy
 
-    if (isApexUp(orientation)) {
-      // top
-      if (y > yMid) {
-        return Triangle(stackIndex(IndexTop), nextOrientation(IndexTop), Extent(x14, x34), Extent(yMid, Y.max), depth + 1).getTriangle(x, y, maxDepth - 1)
-      }
-      // lower left
-      val b0 = (xMid * yMid) / (xMid - x14) + y0 * x14
-      val m0 = (y0 - b0) / xMid
-      if (y < (m0 * x + b0)) {
-        return Triangle(stackIndex(IndexLL), nextOrientation(IndexLL), Extent(x0, xMid), Extent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
-      }
-      // lower right
-      val m1 = (yMid - y0) / (x1 - xMid)
-      val b1 = y0 - m1 * xMid
-      if (y < (m1 + x * b1)) {
-        return Triangle(stackIndex(IndexLR), nextOrientation(IndexLR), Extent(xMid, x1), Extent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
-      }
-      // middle
-      return Triangle(stackIndex(IndexCenter), nextOrientation(IndexCenter), Extent(x14, x34), Extent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
-    } else {
+    println(s"  y0 $y0, yMid $yMid, y1 $y1")
 
+    // apex
+    println(s"  check apex:  y $y => |y-y1| ${Math.abs(y - y1)}, |y-y0| ${Math.abs(y - y0)}")
+    if (Math.abs(y - y1) < Math.abs(y - y0)) {
+      println("  APEX")
+      require(x >= x14 && x <= x34, s"Cannot recurse into apex, X $x is out of range ($x14, $x34)")
+      return Triangle(stackIndex(TransApex), OrientationTransitions((orientation, TransApex)), Extent(x14, x34), makeExtent(yMid, y1), depth + 1).getTriangle(x, y, maxDepth - 1)
     }
 
-    val iy: Int = if (y >= 0.5 * (Y.min + Y.max)) 1 else 0
-      
-    // two cases:  apex up; or apex down
+    // you know you're recursing into the base
 
-    // TODO!
-    null
+    println(s"  x0 $x0, xMid $xMid, x1 $x1")
+
+    // check left and right
+    if (x < xMid) {
+      // check left
+      val xProbe: Double = mLeftInv * (y - y0) + xMid
+      println(s"  xProbe = $mLeftInv * ($y - $y0) = $xProbe")
+      if (xProbe > x0 && xProbe < xMid && x < xProbe) {
+        println("  LEFT")
+        return Triangle(stackIndex(TransLL), OrientationTransitions((orientation, TransLL)), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
+      }
+      println("  Cannot recurse Left")
+    } else {
+      // check right
+      val xProbe: Double = mRightInv * (y - y0) + xMid
+      println(s"  xProbe = $mRightInv * ($y - $y0) = $xProbe")
+      if (xProbe >= xMid && xProbe <= x1 && x >= xProbe) {
+        println("  RIGHT")
+        return Triangle(stackIndex(TransLR), OrientationTransitions((orientation, TransLR)), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
+        println("  Cannot recurse Right")
+      }
+    }
+
+    // if you get this far, recurse center
+    println("  CENTER")
+    return Triangle(stackIndex(TransCenter), OrientationTransitions((orientation, TransCenter)), Extent(x14, x34), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
   }
 
   def polygonPoints: String = orientation match {
@@ -134,6 +151,15 @@ object TriN {
   val TransLL = 4
 
   val Transitions: Set[Int] = Set(TransCenter, TransApex, TransLR, TransLL)
+
+  val MPos: Double = 2.0
+  val MPosInv: Double = 1.0 / MPos
+  val MNeg: Double = -2.0
+  val MNegInv: Double = 1.0 / MNeg
+
+  def makeExtent(a: Double, b: Double): Extent[Double] =
+    if (a <= b) Extent(a, b)
+    else Extent(b, a)
 
   def isValidOrientation(orientation: Int): Boolean = Orientations.contains(orientation)
 
@@ -235,7 +261,10 @@ object TriN {
     val idx: Long = (iy << 2) | (if (ix < 2) ix else 5 - ix)
     val x0: Double = -180.0 + 90.0 * ix
     val y0: Double = -90.0 + 90.0 * iy
-    Triangle(idx, orientation, Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
+    val xT0: Double = getXT(x0, y, Extent(x0, x0 + 90.0))
+    val xT1: Double = getXT(x0 + 90.0, y, Extent(x0, x0 + 90.0))
+    println(s"X ($x0, ${x0 + 90.0}), X' ($xT0, $xT1)")
+    Triangle(idx, orientation, Extent(xT0, xT1), Extent(y0, y0 + 90.0), 1)
   }
 
   def getXT(x: Double, y: Double, X: Extent[Double]): Double = {
@@ -270,9 +299,13 @@ object TriN {
     require(maxDepth > 0, s"maxDepth must be at least one; found $maxDepth")
     val t0 = getInitialTriangle(x, y)
     if (maxDepth > 1) {
-      t0.getTriangle(getXT(x, y, t0.X), y, maxDepth - 1)
+      val result = t0.getTriangle(getXT(x, y, t0.X), y, maxDepth - 1)
+      println(s"Recursed result:  $result")
+      result
     } else {
-      t0
+      val result = t0
+      println(s"Top-level result:  $result")
+      result
     }
   }
 
@@ -292,65 +325,6 @@ class TriN {
 object TriTest extends App {
   var pw: PrintWriter = null
 
-  def testInitialTri(n: Int, x: Double, y: Double): Unit = {
-    val t = getTriangle(x, y, 1)
-    val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
-    val xT = getXT(x, y, t.X)
-//    println(f"  x' $xT%1.4f")
-    val x2 = getXTInv(xT, y, t.X)
-//    println(f"  x2 $x2%1.4f")
-    pw.println(f"$n%d\tPOINT($x%1.4f $y%1.4f)\tPOINT($xT%1.4f $y%1.4f)\t$bIndex%s")
-    require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
-  }
-
-  try {
-    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
-    pw.println("index\twkt")
-    for (row <- 0 to 1; col <- 0 to 3) {
-      val x0 = -180.0 + 90.0 * col
-      val y0 = -90.0 + 90.0 * row
-      val x1 = x0 + 90.0 - 1e-6
-      val y1 = y0 + 90.0 - 1e-6
-      val xMid = 0.5 * (x0 + x1)
-      val yMid = 0.5 * (x0 + x1)
-      val index = getInitialTriangle(xMid, yMid).index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
-      if (row == 0) {
-        pw.println(s"$index\tPOLYGON(($x0 $y1, $xMid $y0, $x1 $y1, $x0 $y1))")
-      } else {
-        pw.println(s"$index\tPOLYGON(($x0 $y0, $xMid $y1, $x1 $y0, $x0 $y0))")
-      }
-    }
-    pw.close()
-
-    pw = new PrintWriter(new FileWriter("test.txt"))
-    pw.println("label\torig_wkt\ttri_wkt\tindex")
-    val xs = (-179.999 to 179.999 by 22.5).zipWithIndex
-    val ys = (-89.999 to 89.999 by 11.25*0.5).zipWithIndex
-    val ny = ys.length
-    for (xx <- xs; yy <- ys) {
-      testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
-    }
-//    testInitialTri(1, 45.0, 45.0)
-//    testInitialTri(2, 0.0, 0.0)
-//    testInitialTri(3, 45.0, -45.0)
-//    testInitialTri(4, -180.0, -45.0)
-//    testInitialTri(5, 179.9999, 45.0)
-//    testInitialTri(6, 0.0, 89.9999)
-//    testInitialTri(7, -78.4767, 38.0293)
-    pw.close()
-
-    pw = new PrintWriter(new FileWriter("test-index.txt"))
-    pw.println("depth\tindex_dec\tindex_bits\twkt")
-    (1 to 5).foldLeft((-78.4767, 38.0293))((acc, depth) => acc match {
-      case (x, y) =>
-        val t = getTriangle(-78.4767, 38.0293, depth)
-        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt)
-        (x, y)
-    })
-  } finally {
-    pw.close()
-  }
-  
   // H must be invertible
   assert(A_BC == H(H(A_BC)), s"Uninvertible:  A_BC <> H(H(A_BC))")
   assert(B_CA == H(H(B_CA)), s"Uninvertible:  B_CA <> H(H(B_CA))")
@@ -406,4 +380,93 @@ object TriTest extends App {
   assert(AC_B == CW(CW(CW(CW(CW(CW(AC_B)))))), s"Uninvertible:  AC_B <> CW(CW(CW(CW(CW(CW(AC_B))))))")
   assert(BA_C == CW(CW(CW(CW(CW(CW(BA_C)))))), s"Uninvertible:  BA_C <> CW(CW(CW(CW(CW(CW(BA_C))))))")
   assert(CB_A == CW(CW(CW(CW(CW(CW(CB_A)))))), s"Uninvertible:  CB_A <> CW(CW(CW(CW(CW(CW(CB_A))))))")
+
+  // CW must be the inverse of CCW
+  assert(A_BC == CW(CCW(A_BC)), s"Uninvertible:  A_BC <> CW(CCW(A_BC))")
+  assert(B_CA == CW(CCW(B_CA)), s"Uninvertible:  B_CA <> CW(CCW(B_CA))")
+  assert(C_AB == CW(CCW(C_AB)), s"Uninvertible:  C_AB <> CW(CCW(C_AB))")
+  assert(A_CB == CW(CCW(A_CB)), s"Uninvertible:  A_CB <> CW(CCW(A_CB))")
+  assert(B_AC == CW(CCW(B_AC)), s"Uninvertible:  B_AC <> CW(CCW(B_AC))")
+  assert(C_BA == CW(CCW(C_BA)), s"Uninvertible:  C_BA <> CW(CCW(C_BA))")
+  assert(AB_C == CW(CCW(AB_C)), s"Uninvertible:  AB_C <> CW(CCW(AB_C))")
+  assert(BC_A == CW(CCW(BC_A)), s"Uninvertible:  BC_A <> CW(CCW(BC_A))")
+  assert(CA_B == CW(CCW(CA_B)), s"Uninvertible:  CA_B <> CW(CCW(CA_B))")
+  assert(AC_B == CW(CCW(AC_B)), s"Uninvertible:  AC_B <> CW(CCW(AC_B))")
+  assert(BA_C == CW(CCW(BA_C)), s"Uninvertible:  BA_C <> CW(CCW(BA_C))")
+  assert(CB_A == CW(CCW(CB_A)), s"Uninvertible:  CB_A <> CW(CCW(CB_A))")
+
+  // CCW must be the inverse of CW
+  assert(A_BC == CCW(CW(A_BC)), s"Uninvertible:  A_BC <> CCW(CW(A_BC))")
+  assert(B_CA == CCW(CW(B_CA)), s"Uninvertible:  B_CA <> CCW(CW(B_CA))")
+  assert(C_AB == CCW(CW(C_AB)), s"Uninvertible:  C_AB <> CCW(CW(C_AB))")
+  assert(A_CB == CCW(CW(A_CB)), s"Uninvertible:  A_CB <> CCW(CW(A_CB))")
+  assert(B_AC == CCW(CW(B_AC)), s"Uninvertible:  B_AC <> CCW(CW(B_AC))")
+  assert(C_BA == CCW(CW(C_BA)), s"Uninvertible:  C_BA <> CCW(CW(C_BA))")
+  assert(AB_C == CCW(CW(AB_C)), s"Uninvertible:  AB_C <> CCW(CW(AB_C))")
+  assert(BC_A == CCW(CW(BC_A)), s"Uninvertible:  BC_A <> CCW(CW(BC_A))")
+  assert(CA_B == CCW(CW(CA_B)), s"Uninvertible:  CA_B <> CCW(CW(CA_B))")
+  assert(AC_B == CCW(CW(AC_B)), s"Uninvertible:  AC_B <> CCW(CW(AC_B))")
+  assert(BA_C == CCW(CW(BA_C)), s"Uninvertible:  BA_C <> CCW(CW(BA_C))")
+  assert(CB_A == CCW(CW(CB_A)), s"Uninvertible:  CB_A <> CCW(CW(CB_A))")
+
+  def testInitialTri(n: Int, x: Double, y: Double): Unit = {
+    val t = getTriangle(x, y, 1)
+    val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
+    val xT = getXT(x, y, t.X)
+//    println(f"  x' $xT%1.4f")
+    val x2 = getXTInv(xT, y, t.X)
+//    println(f"  x2 $x2%1.4f")
+    pw.println(f"$n%d\tPOINT($x%1.4f $y%1.4f)\tPOINT($xT%1.4f $y%1.4f)\t$bIndex%s")
+    require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
+  }
+
+  println(s"Charlotteville X:  ${getXT(-78.4767, 38.0293, Extent(-90.0, 0.0))}")
+
+  try {
+    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
+    pw.println("index\twkt")
+    for (row <- 0 to 1; col <- 0 to 3) {
+      val x0 = -180.0 + 90.0 * col
+      val y0 = -90.0 + 90.0 * row
+      val x1 = x0 + 90.0 - 1e-6
+      val y1 = y0 + 90.0 - 1e-6
+      val xMid = 0.5 * (x0 + x1)
+      val yMid = 0.5 * (x0 + x1)
+      val index = getInitialTriangle(xMid, yMid).index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
+      if (row == 0) {
+        pw.println(s"$index\tPOLYGON(($x0 $y1, $xMid $y0, $x1 $y1, $x0 $y1))")
+      } else {
+        pw.println(s"$index\tPOLYGON(($x0 $y0, $xMid $y1, $x1 $y0, $x0 $y0))")
+      }
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test.txt"))
+    pw.println("label\torig_wkt\ttri_wkt\tindex")
+    val xs = (-179.999 to 179.999 by 22.5).zipWithIndex
+    val ys = (-89.999 to 89.999 by 11.25*0.5).zipWithIndex
+    val ny = ys.length
+    for (xx <- xs; yy <- ys) {
+      testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
+    }
+//    testInitialTri(1, 45.0, 45.0)
+//    testInitialTri(2, 0.0, 0.0)
+//    testInitialTri(3, 45.0, -45.0)
+//    testInitialTri(4, -180.0, -45.0)
+//    testInitialTri(5, 179.9999, 45.0)
+//    testInitialTri(6, 0.0, 89.9999)
+//    testInitialTri(7, -78.4767, 38.0293)
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-index.txt"))
+    pw.println("depth\tindex_dec\tindex_bits\twkt")
+    (1 to 6).foldLeft((-78.4767, 38.0293))((acc, depth) => acc match {
+      case (x, y) =>
+        val t = getTriangle(-78.4767, 38.0293, depth)
+        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt)
+        (x, y)
+    })
+  } finally {
+    pw.close()
+  }
 }
