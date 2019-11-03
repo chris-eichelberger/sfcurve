@@ -58,7 +58,7 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
       (Y.max, Y.min, MPosInv, MNegInv)
     }
     val dy = Math.abs(y1 - y0)
-    val yMid = y0 + 0.50 * dy
+    val yMid = 0.5 * (y0 + y1)
 
     println(s"  y0 $y0, yMid $yMid, y1 $y1")
 
@@ -261,10 +261,7 @@ object TriN {
     val idx: Long = (iy << 2) | (if (ix < 2) ix else 5 - ix)
     val x0: Double = -180.0 + 90.0 * ix
     val y0: Double = -90.0 + 90.0 * iy
-    val xT0: Double = getXT(x0, y, Extent(x0, x0 + 90.0))
-    val xT1: Double = getXT(x0 + 90.0, y, Extent(x0, x0 + 90.0))
-    println(s"X ($x0, ${x0 + 90.0}), X' ($xT0, $xT1)")
-    Triangle(idx, orientation, Extent(xT0, xT1), Extent(y0, y0 + 90.0), 1)
+    Triangle(idx, orientation, Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
   }
 
   def getXT(x: Double, y: Double, X: Extent[Double]): Double = {
@@ -458,11 +455,20 @@ object TriTest extends App {
 //    testInitialTri(7, -78.4767, 38.0293)
     pw.close()
 
+    val homeLat = 38.054444
+    val homeLon = -78.688256
+
+    val cvilleLat = 38.0293
+    val cvilleLon = -78.4767
+
+    val targetLat = homeLat
+    val targetLon = homeLon
+
     pw = new PrintWriter(new FileWriter("test-index.txt"))
     pw.println("depth\tindex_dec\tindex_bits\twkt")
-    (1 to 6).foldLeft((-78.4767, 38.0293))((acc, depth) => acc match {
+    (1 to 21).foldLeft((targetLon, targetLat))((acc, depth) => acc match {
       case (x, y) =>
-        val t = getTriangle(-78.4767, 38.0293, depth)
+        val t = getTriangle(targetLon, targetLat, depth)
         pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt)
         (x, y)
     })
