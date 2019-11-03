@@ -316,7 +316,16 @@ object TriN {
   }
 }
 
-class TriN {
+object NamedLocations {
+  case class LatLon(latitude: Double, longitude: Double)
+  val LocationsByName: Map[String, LatLon] = Map(
+    "Charlottesville" -> LatLon(38.0293, -78.4767),
+    "Eichelberger" -> LatLon(38.054444, -78.688256),
+    "Uluru" -> LatLon(-25.344407, 131.036881),
+    "Ipanema" -> LatLon(-22.986877, -43.208614),
+    "Bogata" -> LatLon(4.592899, -74.123853),
+    "Ravensburg" ->LatLon(47.776487, 9.610370)
+  )
 }
 
 object TriTest extends App {
@@ -417,9 +426,18 @@ object TriTest extends App {
     require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
   }
 
-  println(s"Charlotteville X:  ${getXT(-78.4767, 38.0293, Extent(-90.0, 0.0))}")
-
   try {
+    import NamedLocations._
+
+    pw = new PrintWriter(new FileWriter("test-points.txt"))
+    pw.println("name\torig_wkt\toct_wkt")
+    LocationsByName.foreach {
+      case (name, LatLon(y, x)) =>
+        val t = getInitialTriangle(x, y)
+        pw.println(s"$name\tPOINT($x $y)\tPOINT(${getXT(x, y, t.X)} $y)")
+    }
+    pw.close()
+
     pw = new PrintWriter(new FileWriter("test-triangles.txt"))
     pw.println("index\twkt")
     for (row <- 0 to 1; col <- 0 to 3) {
@@ -455,20 +473,13 @@ object TriTest extends App {
 //    testInitialTri(7, -78.4767, 38.0293)
     pw.close()
 
-    val homeLat = 38.054444
-    val homeLon = -78.688256
-
-    val cvilleLat = 38.0293
-    val cvilleLon = -78.4767
-
-    val targetLat = homeLat
-    val targetLon = homeLon
+    val target: LatLon = LocationsByName("Ravensburg")
 
     pw = new PrintWriter(new FileWriter("test-index.txt"))
     pw.println("depth\tindex_dec\tindex_bits\twkt")
-    (1 to 21).foldLeft((targetLon, targetLat))((acc, depth) => acc match {
+    (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
-        val t = getTriangle(targetLon, targetLat, depth)
+        val t = getTriangle(target.longitude, target.latitude, depth)
         pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt)
         (x, y)
     })
