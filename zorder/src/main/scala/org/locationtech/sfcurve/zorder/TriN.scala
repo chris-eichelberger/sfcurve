@@ -39,8 +39,6 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
   def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
-    println(s"$this:  getTriangle($x, $y, $maxDepth)...")
-
     require(X.contains(x), s"X is out of bounds:  $x notIn $X")
     require(Y.contains(y), s"Y is out of bounds:  $y notIn $Y")
 
@@ -57,46 +55,32 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     } else {
       (Y.max, Y.min, MPosInv, MNegInv)
     }
-    val dy = Math.abs(y1 - y0)
     val yMid = 0.5 * (y0 + y1)
 
-    println(s"  y0 $y0, yMid $yMid, y1 $y1")
-
     // apex
-    println(s"  check apex:  y $y => |y-y1| ${Math.abs(y - y1)}, |y-y0| ${Math.abs(y - y0)}")
     if (Math.abs(y - y1) < Math.abs(y - y0)) {
-      println("  APEX")
       require(x >= x14 && x <= x34, s"Cannot recurse into apex, X $x is out of range ($x14, $x34)")
       return Triangle(stackIndex(TransApex), OrientationTransitions((orientation, TransApex)), Extent(x14, x34), makeExtent(yMid, y1), depth + 1).getTriangle(x, y, maxDepth - 1)
     }
 
     // you know you're recursing into the base
 
-    println(s"  x0 $x0, xMid $xMid, x1 $x1")
-
     // check left and right
     if (x < xMid) {
       // check left
       val xProbe: Double = mLeftInv * (y - y0) + xMid
-      println(s"  xProbe = $mLeftInv * ($y - $y0) = $xProbe")
       if (xProbe > x0 && xProbe < xMid && x < xProbe) {
-        println("  LEFT")
         return Triangle(stackIndex(TransLL), OrientationTransitions((orientation, TransLL)), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
       }
-      println("  Cannot recurse Left")
     } else {
       // check right
       val xProbe: Double = mRightInv * (y - y0) + xMid
-      println(s"  xProbe = $mRightInv * ($y - $y0) = $xProbe")
       if (xProbe >= xMid && xProbe <= x1 && x >= xProbe) {
-        println("  RIGHT")
         return Triangle(stackIndex(TransLR), OrientationTransitions((orientation, TransLR)), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
-        println("  Cannot recurse Right")
       }
     }
 
     // if you get this far, recurse center
-    println("  CENTER")
     return Triangle(stackIndex(TransCenter), OrientationTransitions((orientation, TransCenter)), Extent(x14, x34), makeExtent(y0, yMid), depth + 1).getTriangle(x, y, maxDepth - 1)
   }
 
@@ -269,12 +253,6 @@ object TriN {
     val pY = (90.0 - Math.abs(y)) / 90.0
     val xMid = X.min + 0.5 * dx
     val xT = xMid - pY * (xMid - x)
-//    println(f"getXT($x%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
-//    println(f"  dx $dx%1.4f")
-//    println(f"  xMid $xMid%1.4f")
-//    println(f"  pY $pY%1.4f")
-//    println(f"  xMid - xT")
-//    println(f"  xT $xT%1.4f")
     xT
   }
 
@@ -283,12 +261,6 @@ object TriN {
     val pY = (90.0 - Math.abs(y)) / 90.0
     val xMid = X.min + 0.5 * dx
     val x = if (pY > 1e-6) xMid - (xMid - xT) / pY else xT
-//    println(f"getXTInv($xT%1.4f, $y%1.4f, [${X.min}%1.4f, ${X.max}%1.4f])...")
-//    println(f"  dx $dx%1.4f")
-//    println(f"  xMid $xMid%1.4f")
-//    println(f"  pY $pY%1.4f")
-//    println(f"  xMid - xT")
-//    println(f"  x $x%1.4f")
     x
   }
 
@@ -297,11 +269,9 @@ object TriN {
     val t0 = getInitialTriangle(x, y)
     if (maxDepth > 1) {
       val result = t0.getTriangle(getXT(x, y, t0.X), y, maxDepth - 1)
-      println(s"Recursed result:  $result")
       result
     } else {
       val result = t0
-      println(s"Top-level result:  $result")
       result
     }
   }
@@ -419,11 +389,11 @@ object TriTest extends App {
     val t = getTriangle(x, y, 1)
     val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
     val xT = getXT(x, y, t.X)
-//    println(f"  x' $xT%1.4f")
     val x2 = getXTInv(xT, y, t.X)
-//    println(f"  x2 $x2%1.4f")
     pw.println(f"$n%d\tPOINT($x%1.4f $y%1.4f)\tPOINT($xT%1.4f $y%1.4f)\t$bIndex%s")
-    require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
+    if (Math.abs(y) < 89.5) {
+      require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
+    }
   }
 
   try {
@@ -458,25 +428,17 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test.txt"))
     pw.println("label\torig_wkt\ttri_wkt\tindex")
-    val xs = (-179.999 to 179.999 by 22.5).zipWithIndex
-    val ys = (-89.999 to 89.999 by 11.25*0.5).zipWithIndex
+    val xs = (-180.0 to 179.999 by 22.5).zipWithIndex
+    val ys = (-90.0 to 89.999 by 11.25*0.5).zipWithIndex
     val ny = ys.length
     for (xx <- xs; yy <- ys) {
       testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
     }
-//    testInitialTri(1, 45.0, 45.0)
-//    testInitialTri(2, 0.0, 0.0)
-//    testInitialTri(3, 45.0, -45.0)
-//    testInitialTri(4, -180.0, -45.0)
-//    testInitialTri(5, 179.9999, 45.0)
-//    testInitialTri(6, 0.0, 89.9999)
-//    testInitialTri(7, -78.4767, 38.0293)
     pw.close()
-
-    val target: LatLon = LocationsByName("Ravensburg")
 
     pw = new PrintWriter(new FileWriter("test-index.txt"))
     pw.println("depth\tindex_dec\tindex_bits\twkt")
+    val target: LatLon = LocationsByName("Eichelberger")
     (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target.longitude, target.latitude, depth)
