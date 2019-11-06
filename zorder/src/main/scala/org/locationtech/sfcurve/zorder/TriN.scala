@@ -42,9 +42,9 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
   val yMid: Double = 0.5 * (y0 + y1)
 
-  def bitString: String = index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
+  def bitString: String = indexBinaryString(index, depth)
 
-  def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 3)
+  def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 7)
 
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
@@ -289,6 +289,9 @@ object TriN {
     }
   }
 
+  def indexBinaryString(index: Long, depth: Int): String =
+    index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
+
   def index(x: Double, y: Double, maxDepth: Int): Long = {
     getTriangle(x, y, maxDepth).index
   }
@@ -300,13 +303,34 @@ object TriN {
     val octIdxX = octIdx & 3
     val octXi = if (octIdxX < 2) octIdxX else 5 - octIdxX
     val octYi = (octIdx >> 2) & 1
-    val x0 = octXi * 90.0
-    val y0 = octYi * 90.0
+    val x0 = octXi * 90.0 - 180.0
+    val y0 = octYi * 90.0 - 90.0
     val t0: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
+
+    println(s"invIndex(${indexBinaryString(idx, depth)}, $depth)...")
 
     (depth - 2  to 0 by -1).foldLeft(t0)((acc, i) => {
       val triad = (idx >> (3 * i)) & 7
+      println(s"  triad $i:  ${indexBinaryString(triad, 1)}")
       acc.child(triad.toInt)
+    })
+  }
+
+  def iterator(depth: Int): Iterator[Triangle] = {
+    require(depth > 0, s"Depth ($depth) must be a positive integer")
+
+    val faces: Seq[Int] = (0 to 7).toSeq
+    val seqs: Seq[Seq[Int]] = (2 to depth).foldLeft(Seq(faces))((acc, _) => acc ++ Seq(Transitions.toSeq))
+
+    CartesianProductIterable(seqs).iterator.map( seq => {
+      val index = seq.foldLeft(0L)((acc, i) => i match {
+        case n: Int =>
+          (acc << 3) | n
+      })
+      val t = invIndex(index, depth)
+      println(s"  iteration:  ${seq.mkString("(", ", ", ")")} -> ${indexBinaryString(index, depth)} == ${t.bitString}")
+      require(t.index == index)
+      t
     })
   }
 }
@@ -493,6 +517,13 @@ object TriTest extends App {
         pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt)
         (x, y)
     })
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-tiles.txt"))
+    pw.println("index_dec\tindex_bits\twkt")
+    for (t <- iterator(2)) {
+      pw.println(s"${t.index}\t${t.bitString}\t${t.wkt}")
+    }
   } finally {
     pw.close()
   }
