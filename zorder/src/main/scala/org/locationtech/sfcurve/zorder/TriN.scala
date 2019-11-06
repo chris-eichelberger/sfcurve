@@ -48,12 +48,22 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
-  def child(transition: Int): Triangle = transition match {
-    case TransCenter => Triangle(stackIndex(TransCenter), nextOrientation(TransCenter), Extent(x14, x34), makeExtent(y0, yMid), depth + 1)
-    case TransApex =>   Triangle(stackIndex(TransApex), nextOrientation(TransApex), Extent(x14, x34), makeExtent(yMid, y1), depth + 1)
-    case TransLL =>     Triangle(stackIndex(TransLL), nextOrientation(TransLL), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1)
-    case TransLR =>     Triangle(stackIndex(TransLR), nextOrientation(TransLR), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1)
-    case _ =>           throw new Exception(s"Invalid transition $transition")
+  def child(transition: Int): Triangle = {
+    val nextIndex = stackIndex(transition match {
+      case TransCenter => Center
+      case TransApex   => Corners(orientation)(0)
+      case TransLL     => Corners(orientation)(2)
+      case TransLR     => Corners(orientation)(1)
+      case _ => throw new Exception("Invalid transition $transition")
+    })
+
+    transition match {
+      case TransCenter => Triangle(nextIndex, nextOrientation(TransCenter), Extent(x14, x34), makeExtent(y0, yMid), depth + 1)
+      case TransApex =>   Triangle(nextIndex, nextOrientation(TransApex), Extent(x14, x34), makeExtent(yMid, y1), depth + 1)
+      case TransLL =>     Triangle(nextIndex, nextOrientation(TransLL), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1)
+      case TransLR =>     Triangle(nextIndex, nextOrientation(TransLR), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1)
+      case _ =>           throw new Exception(s"Invalid transition $transition")
+    }
   }
 
   def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
@@ -114,6 +124,13 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 object TriN {
   val TriTopLongitude = Longitude(4)
   val TriTopLatitude = Latitude(2)
+
+  // corners
+  val A = 1
+  val B = 2
+  val C = 4
+
+  val Center = 0
 
   // possible triangle orientations...
   // apex up
@@ -224,6 +241,34 @@ object TriN {
     case _ => throw new Exception(s"Invalid orientation ($orientation)")
   }
 
+  val Corners: Map[Int, Vector[Int]] = Map(
+    A_BC -> Vector(A, B, C),
+    A_CB -> Vector(A, C, B),
+    B_AC -> Vector(B, A, C),
+    B_CA -> Vector(B, C, A),
+    C_AB -> Vector(C, A, B),
+    C_BA -> Vector(C, B, A),
+    BC_A -> Vector(A, B, C),
+    CB_A -> Vector(A, C, B),
+    AC_B -> Vector(B, A, C),
+    CA_B -> Vector(B, C, A),
+    AB_C -> Vector(C, A, B),
+    BA_C -> Vector(C, B, A)
+  )
+
+  val TransitionsByOrientationCorner: Map[(Int, Int), Int] = {
+    val orientationCornersItr = CartesianProductIterable(Seq(Orientations.toSeq, Seq(Center, A, B, C)))
+    orientationCornersItr.map {
+      case Seq(orientation: Int, corner: Int) =>
+        Corners(orientation.asInstanceOf[Int]) match {
+          case Vector(c, _, _) if c == corner => (orientation.asInstanceOf[Int], corner.asInstanceOf[Int]) -> TransApex
+          case Vector(_, c, _) if c == corner => (orientation.asInstanceOf[Int], corner.asInstanceOf[Int]) -> TransLR
+          case Vector(_, _, c) if c == corner => (orientation.asInstanceOf[Int], corner.asInstanceOf[Int]) -> TransLL
+          case _                              => (orientation.asInstanceOf[Int], corner.asInstanceOf[Int]) -> TransCenter
+        }
+    }
+  }.toMap
+
   val OrientationTransitions: Map[(Int, Int), Int] = {
     val orientationTransitionsItr = CartesianProductIterable(Seq(Orientations.toSeq, Transitions.toSeq))
     orientationTransitionsItr.map {
@@ -308,8 +353,8 @@ object TriN {
     val t0: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
 
     (depth - 2  to 0 by -1).foldLeft(t0)((acc, i) => {
-      val triad = (idx >> (3 * i)) & 7
-      acc.child(triad.toInt)
+      val corner = (idx >> (3 * i)) & 7
+      acc.child(TransitionsByOrientationCorner((acc.orientation, corner.toInt)))
     })
   }
 
@@ -528,14 +573,14 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
     pw.println("index_dec\tindex_bits\twkt")
-    for (t <- iterator(3)) {
+    for (t <- iterator(4)) {
       pw.println(s"${t.index}\t${t.bitString}\t${t.wkt}")
     }
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-progression.txt"))
     pw.println("index_from\tindex_to\twkt")
-    for (t <- iterator(3).sliding(2, 1)) t match {
+    for (t <- iterator(4).sliding(2, 1)) t match {
       case Seq(t0, t1) =>
         pw.println(s"${t0.index}\t${t1.index}\t${lineWkt(t0, t1)}")
     }
