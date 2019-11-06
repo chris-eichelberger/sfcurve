@@ -48,6 +48,17 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
+  def areaSquareDegrees: Double = 0.5 * Math.abs(x1 - x0) * Math.abs(y1 - y0)
+
+  def areaSquareMeters: Double = {
+    val dxDeg = Math.abs(x1 - x0)
+    val dyDeg = Math.abs(y1 - y0)
+    val yDeg = 0.5 * (y1 + y0)
+    val dyM = dyDeg * 111.32 * 1000.0
+    val dxM = dxDeg * Math.cos(Math.toRadians(yDeg)) * 111.32 * 1000.0
+    0.5 * dyM * dxM
+  }
+
   def child(transition: Int): Triangle = {
     val nextIndex = stackIndex(transition match {
       case TransCenter => Center
@@ -403,9 +414,16 @@ object NamedLocations {
     "Beijing" -> LatLon(39.908780, 116.397482),
     "Cabo San Lucas" -> LatLon(22.889986, -109.918799),
     "Hanga Roa" -> LatLon(-27.139735, -109.427335),
-    "Gisborne" -> LatLon(-38.670242, 178.026712),
+    "Wellington" -> LatLon(-41.288435, 174.777162),
     "South Pole" -> LatLon(-90.0, -179.0),
     "North Pole" -> LatLon(90.0 - 1e-10, 179.0),
+    "Fiji" -> LatLon(-17.825785, 177.960057),
+    "Tahiti" -> LatLon(-17.682831, -149.445502),
+    "London" -> LatLon(51.501044, -0.124639),
+    "Johannesburg" -> LatLon(-26.188086, 28.042677),
+    "Riyadh" -> LatLon(24.698679, 46.672781),
+    "Moscow" -> LatLon(55.752628, 37.623058),
+    "Seattle" -> LatLon(47.622318, -122.316094),
     "Null Island" -> LatLon(0.0, 0.0)
   )
 }
@@ -561,12 +579,12 @@ object TriTest extends App {
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-index.txt"))
-    pw.println("depth\tindex_dec\tindex_bits\twkt")
+    pw.println("depth\tindex_dec\tindex_bits\twkt\tarea_deg2\tarea_m2")
     val target: LatLon = LocationsByName("Eichelberger")
     (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target.longitude, target.latitude, depth)
-        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt)
+        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt + "\t" + t.areaSquareDegrees + "\t" + t.areaSquareMeters)
         (x, y)
     })
     pw.close()
@@ -583,6 +601,24 @@ object TriTest extends App {
     for (t <- iterator(4).sliding(2, 1)) t match {
       case Seq(t0, t1) =>
         pw.println(s"${t0.index}\t${t1.index}\t${lineWkt(t0, t1)}")
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-distance.txt"))
+    pw.println("dist_geom\tdist_index\twkt")
+    for (i <- 1 to 1000) {
+      val x0 = Math.toRadians(0.5 + Math.random() * 359.0)
+      val y0 = Math.toRadians(0.5 + Math.random() * 179.0)
+      val x1 = Math.toRadians(0.5 + Math.random() * 359.0)
+      val y1 = Math.toRadians(0.5 + Math.random() * 179.0)
+      val distGeom = Math.acos(Math.sin(y0) * Math.sin(y1) + Math.cos(y0) * Math.cos(y1) * Math.cos(Math.abs(x1 - x0))) / Math.PI
+      val t0: Triangle = getTriangle(x0, y0, 21)
+      val t1: Triangle = getTriangle(x1, y1, 21)
+      val distIndex = t0.bitString.split("").zip(t1.bitString.split("")).map {
+        case (i0, i1) => if (i0 == i1) 0 else 1
+      }.sum.toDouble / t0.bitString.length.toDouble
+      val wkt = "POINT(" + (200.0 + distGeom * 100.0) + " " + (0.0 + distIndex * 100.0) + ")"
+      pw.println(s"$distGeom\t$distIndex\t$wkt")
     }
   } finally {
     pw.close()
