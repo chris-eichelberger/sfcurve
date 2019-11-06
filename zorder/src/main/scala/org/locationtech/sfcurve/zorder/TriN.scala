@@ -307,11 +307,8 @@ object TriN {
     val y0 = octYi * 90.0 - 90.0
     val t0: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
 
-    println(s"invIndex(${indexBinaryString(idx, depth)}, $depth)...")
-
     (depth - 2  to 0 by -1).foldLeft(t0)((acc, i) => {
       val triad = (idx >> (3 * i)) & 7
-      println(s"  triad $i:  ${indexBinaryString(triad, 1)}")
       acc.child(triad.toInt)
     })
   }
@@ -320,19 +317,29 @@ object TriN {
     require(depth > 0, s"Depth ($depth) must be a positive integer")
 
     val faces: Seq[Int] = (0 to 7).toSeq
-    val seqs: Seq[Seq[Int]] = (2 to depth).foldLeft(Seq(faces))((acc, _) => acc ++ Seq(Transitions.toSeq))
+    val seqs: Seq[Seq[Int]] = (2 to depth).foldLeft(Seq(faces))((acc, _) => acc ++ Seq(Transitions.toSeq)).reverse
 
     CartesianProductIterable(seqs).iterator.map( seq => {
-      val index = seq.foldLeft(0L)((acc, i) => i match {
+      val index = seq.reverse.foldLeft(0L)((acc, i) => i match {
         case n: Int =>
           (acc << 3) | n
       })
       val t = invIndex(index, depth)
-      println(s"  iteration:  ${seq.mkString("(", ", ", ")")} -> ${indexBinaryString(index, depth)} == ${t.bitString}")
       require(t.index == index)
       t
     })
   }
+
+  def lineWkt(t0: Triangle, t1: Triangle): String =
+    "LINESTRING(" +
+      (t0.X.min * 0.50 + t0.X.max * 0.50) +
+      " " +
+      (t0.Y.min * 0.50 + t0.Y.max * 0.50) +
+      ", " +
+      (t1.X.min * 0.50 + t1.X.max * 0.50) +
+      " " +
+      (t1.Y.min * 0.50 + t1.Y.max * 0.50) +
+      ")"
 }
 
 object NamedLocations {
@@ -521,8 +528,16 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
     pw.println("index_dec\tindex_bits\twkt")
-    for (t <- iterator(2)) {
+    for (t <- iterator(3)) {
       pw.println(s"${t.index}\t${t.bitString}\t${t.wkt}")
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-progression.txt"))
+    pw.println("index_from\tindex_to\twkt")
+    for (t <- iterator(3).sliding(2, 1)) t match {
+      case Seq(t0, t1) =>
+        pw.println(s"${t0.index}\t${t1.index}\t${lineWkt(t0, t1)}")
     }
   } finally {
     pw.close()
