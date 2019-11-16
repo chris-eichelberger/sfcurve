@@ -145,19 +145,35 @@ object TriN {
 
   // possible triangle orientations...
   // apex up
+  /*
   val A_BC = 0
   val B_CA = 1
   val C_AB = 2
   val A_CB = 3
   val B_AC = 4
   val C_BA = 5
-  // apex down
   val AB_C = 6
   val BC_A = 7
   val CA_B = 8
   val AC_B = 9
   val BA_C = 10
   val CB_A = 11
+  */
+
+  // left hexagon
+  val CB_A = 0
+  val B_AC = 1
+  val AC_B = 2
+  val A_CB = 3
+  val BA_C = 4
+  val C_BA = 5
+  // right hexagon
+  val BC_A = 6
+  val C_AB = 7
+  val AB_C = 8
+  val A_BC = 9
+  val CA_B = 10
+  val B_CA = 11
 
   val Orientations: Set[Int] = Set(
     A_BC, B_CA, C_AB, A_CB, B_AC, C_BA,
@@ -298,10 +314,10 @@ object TriN {
     require(ix >= 0 && ix < 4)
     require(iy >= 0 && iy < 2)
     (iy & 1, ix & 1) match {
-      case (0, 0) => 11
-      case (0, 1) => 7
-      case (1, 0) => 0
-      case (1, 1) => 3
+      case (0, 0) => BC_A
+      case (0, 1) => CB_A
+      case (1, 0) => A_BC
+      case (1, 1) => A_CB
     }
   }
 
