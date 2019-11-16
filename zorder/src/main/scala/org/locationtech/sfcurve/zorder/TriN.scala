@@ -310,6 +310,21 @@ object TriN {
     }.toMap
   }
 
+  val OrientationNames: Map[Int, String] = Map(
+    A_BC -> "A|BC",
+    A_CB -> "A|CB",
+    B_AC -> "B|AC",
+    B_CA -> "B|CA",
+    C_AB -> "C|AB",
+    C_BA -> "C|BA",
+    AB_C -> "AB|C",
+    BA_C -> "BA|C",
+    AC_B -> "AC|B",
+    CA_B -> "CA|B",
+    BC_A -> "BC|A",
+    CB_A -> "CB|A"
+  )
+
   def topOrientation(ix: Int, iy: Int): Int = {
     require(ix >= 0 && ix < 4)
     require(iy >= 0 && iy < 2)
@@ -606,9 +621,9 @@ object TriTest extends App {
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
-    pw.println("index_dec\tindex_bits\twkt")
+    pw.println("orientation\tindex_dec\tindex_bits\twkt")
     for (t <- iterator(4)) {
-      pw.println(s"${t.index}\t${t.bitString}\t${t.wkt}")
+      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.wkt}")
     }
     pw.close()
 
