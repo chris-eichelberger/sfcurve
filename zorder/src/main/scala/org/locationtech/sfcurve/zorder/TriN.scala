@@ -637,7 +637,25 @@ object TriTest extends App {
 
     pw = new PrintWriter(new FileWriter("test-distance.txt"))
     pw.println("dist_geom\tdist_index\twkt")
-    for (i <- 1 to 1000) {
+    def distOld(t0: Triangle, t1: Triangle): Double = {
+      t0.bitString.split("").zip(t1.bitString.split("")).map {
+        case (i0, i1) => if (i0 == i1) 0 else 1
+      }.sum.toDouble / t0.bitString.length.toDouble
+    }
+    def dist(t0: Triangle, t1: Triangle): Double = {
+      require(t0.depth == t1.depth)
+      val bs0: List[String] = t0.bitString.sliding(3, 3).toList
+      val bs1: List[String] = t1.bitString.sliding(3, 3).toList
+      //println(s"dist(${t0.bitString}, ${t1.bitString})...")
+      bs0.zip(bs1).zipWithIndex.foldLeft(0.0)((acc, t) => t match {
+        case ((s0, s1), i) =>
+          val contribution: Double = if (s0.compareTo(s1) == 0) 0.0 else 1.0
+          val weight: Double = Math.pow(2.0, -1.0 * (i + 1.0))
+          //println(s"  |$s0 - $s1| = $contribution * $weight -> ${acc + (contribution * weight)}")
+          acc + (contribution * weight)
+      })
+    }
+    for (i <- (1 to 10000).par) {
       val x0 = Math.toRadians(0.5 + Math.random() * 359.0)
       val y0 = Math.toRadians(0.5 + Math.random() * 179.0)
       val x1 = Math.toRadians(0.5 + Math.random() * 359.0)
@@ -645,10 +663,8 @@ object TriTest extends App {
       val distGeom = Math.acos(Math.sin(y0) * Math.sin(y1) + Math.cos(y0) * Math.cos(y1) * Math.cos(Math.abs(x1 - x0))) / Math.PI
       val t0: Triangle = getTriangle(x0, y0, 21)
       val t1: Triangle = getTriangle(x1, y1, 21)
-      val distIndex = t0.bitString.split("").zip(t1.bitString.split("")).map {
-        case (i0, i1) => if (i0 == i1) 0 else 1
-      }.sum.toDouble / t0.bitString.length.toDouble
-      val wkt = "POINT(" + (200.0 + distGeom * 100.0) + " " + (0.0 + distIndex * 100.0) + ")"
+      val distIndex = dist(t0, t1)
+      val wkt = "POINT(" + (200.0 + distGeom * 100.0) + " " + (0.0 + distIndex * 1000.0) + ")"
       pw.println(s"$distGeom\t$distIndex\t$wkt")
     }
   } finally {
