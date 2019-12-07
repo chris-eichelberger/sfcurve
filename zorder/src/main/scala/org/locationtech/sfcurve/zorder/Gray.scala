@@ -143,7 +143,7 @@ object Gray extends App {
 
     // assumes that the graph is connected
     def getEncoding: Option[Map[Node, Code]] = {
-      val cardinalities: Seq[Seq[Int]] = for (i <- 1 to size) yield Seq(2, 3)
+      val cardinalities: Seq[Seq[Int]] = for (i <- 1 to nodes.size) yield Seq(3, 2)
       val ringSizes: Seq[Seq[_]] = CartesianProductIterable(cardinalities).toSeq
       val schemas: Seq[CodeScheme] = ringSizes.map {
         case s: Seq[Int] =>
@@ -189,7 +189,7 @@ object Gray extends App {
         solve(nodes.toSet, codes.toSet, Map.empty[Node, Code])
       }
 
-      schemas.map(scheme => findEncoding(scheme)).find(solnOpt => solnOpt.isDefined && solnOpt.get.size == nodes.size).flatten
+      schemas.par.map(scheme => findEncoding(scheme)).find(solnOpt => solnOpt.isDefined && solnOpt.get.size == nodes.size).flatten
     }
 
     def isConnected: Boolean = {
@@ -276,6 +276,24 @@ object Gray extends App {
       })
       Graph(nodes, edges)
     }
+
+    def simplifyEncoding(encodingOpt: Option[Map[Node, Code]]): Option[Map[Node, Code]] = {
+      encodingOpt.map(encoding => {
+        val codes: Seq[Code] = encoding.values.toSeq
+        val numPlaces = codes.head.values.size
+        val placesToKeep: Vector[Boolean] = (0 until numPlaces).map(place => {
+          val values: Int = codes.map(_.values(place)).toSet.size
+          values > 1
+        }).toVector
+        encoding.map {
+          case (node, code) =>
+            val newValues: Vector[Int] = code.values.zipWithIndex.flatMap {
+              case (value, place) => if (placesToKeep(place)) Option(value) else None
+            }
+            node -> Code(newValues)
+        }
+      })
+    }
   }
 
   def generate(n: Long): Long = {
@@ -296,12 +314,11 @@ object Gray extends App {
       println(s"  combination $i:  $bits, connected $isConn")
 
       if (isConn) {
-        val encodingOpt = graph.getEncoding
+        val encodingOpt = Graph.simplifyEncoding(graph.getEncoding)
         val comb = graph.canonicalForm.toDot().replaceAll("\n", "  ")
         if (!ucombs.contains(comb)) {
-          encodingOpt.foreach(encoding => println(s"    encoding:  $encoding"))
-          //println(s"  NEW:  $comb")
-          // render the output graph
+          if (encodingOpt.isDefined) println(s"    encoding:  ${encodingOpt.get}")
+          else println(s"    NO ENCODING FOUND")
           graph.render(s"testCombination_$i.png", encodingOpt)
         }
         ucombs.add(comb)
@@ -311,5 +328,5 @@ object Gray extends App {
     numConnected
   }
 
-  generate(3)
+  generate(4)
 }
