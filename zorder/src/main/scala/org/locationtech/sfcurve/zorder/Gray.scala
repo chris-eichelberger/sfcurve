@@ -186,10 +186,14 @@ object Gray extends App {
           }.find(_.size == nodes.size)
         }
 
-        solve(nodes.toSet, codes.toSet, Map.empty[Node, Code])
+        val startNode: Node = nodes.head
+        val startCode: Code = codes.head
+        val startMap: Map[Node, Code] = Map[Node, Code](startNode -> startCode)
+
+        solve(nodes.toSet - startNode, codes.toSet - startCode, startMap)
       }
 
-      schemas.par.map(scheme => findEncoding(scheme)).find(solnOpt => solnOpt.isDefined && solnOpt.get.size == nodes.size).flatten
+      schemas.map(scheme => findEncoding(scheme)).find(solnOpt => solnOpt.isDefined && solnOpt.get.size == nodes.size).flatten
     }
 
     def isConnected: Boolean = {
@@ -311,7 +315,7 @@ object Gray extends App {
       val bits: Seq[Int] = i.toBinaryString.split("").reverse.padTo(numBits, "0").reverseMap(_.toInt)
       val graph = Graph(n, numBits, combinations, bits)
       val isConn = graph.isConnected
-      println(s"  combination $i:  $bits, connected $isConn")
+      println(s"  ${n}-node combination $i / $combinations:  $bits, connected $isConn")
 
       if (isConn) {
         val encodingOpt = Graph.simplifyEncoding(graph.getEncoding)
