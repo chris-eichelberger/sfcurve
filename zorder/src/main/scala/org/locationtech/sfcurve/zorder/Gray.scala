@@ -62,7 +62,14 @@ object Gray extends App {
   }
 
   case class Node(id: Int) {
-    def toDot: String = s"""node_$id [ label=\"$id\" shape=\"circle\" width=0.3 ]"""
+    def toDot(encodingOpt: Option[Map[Node, Code]]): String = {
+      val label = if (encodingOpt.isDefined) {
+        val codeOpt: Option[Code] = encodingOpt.get.get(this)
+        if (codeOpt.isEmpty) throw new Exception(s"Undefined code for node $id")
+        codeOpt.get.values.mkString(",")
+      } else ""
+      s"""node_$id [ label=\"$label\" shape=\"circle\" width=0.3 ]"""
+    }
   }
 
   case class Edge(fromNode: Node, toNode: Node) {
@@ -126,18 +133,16 @@ object Gray extends App {
       })
     }
 
-    def toDot: String =
+    def toDot(encodingOpt: Option[Map[Node, Code]] = None): String =
       "graph G {\n" +
-      nodes.map(node => node.toDot + f" cnx=${connectedness(node)}%1.4f").mkString("  ", "\n  ", "\n") +
+      nodes.map(node => node.toDot(encodingOpt) + f" cnx=${connectedness(node)}%1.4f").mkString("  ", "\n  ", "\n") +
       edges.map(_.toDot).mkString("  ", "\n  ", "\n") +
       "}"
 
     def firstNode: Node = nodes.head
 
     // assumes that the graph is connected
-    def canGray: Boolean = {
-      //println("START canGray...")
-
+    def getEncoding: Option[Map[Node, Code]] = {
       val cardinalities: Seq[Seq[Int]] = for (i <- 1 to size) yield Seq(2, 3)
       val ringSizes: Seq[Seq[_]] = CartesianProductIterable(cardinalities).toSeq
       val schemas: Seq[CodeScheme] = ringSizes.map {
@@ -146,17 +151,14 @@ object Gray extends App {
           CodeScheme(rings)
       }
 
-      //println(s"  cardinalities:  $cardinalities")
-      //println(s"  ring sizes:  $ringSizes")
-
-      def findEncoding(scheme: CodeScheme): Boolean = {
+      def findEncoding(scheme: CodeScheme): Option[Map[Node, Code]] = {
         val NoMapping = Map.empty[Node,Code]
         //println(s"    findEncoding $scheme")
         val codes = scheme.codes.toList
         //println(s"      codes:  $codes")
 
-        def solve(nodesLeft: Set[Node], codesLeft: Set[Code], mapSoFar: Map[Node, Code]): Map[Node, Code] = {
-          if (nodesLeft.isEmpty) return mapSoFar
+        def solve(nodesLeft: Set[Node], codesLeft: Set[Code], mapSoFar: Map[Node, Code]): Option[Map[Node, Code]] = {
+          if (nodesLeft.isEmpty) return Option(mapSoFar)
 
           def acceptable(node: Node, code: Code): Boolean = {
             connections(node).forall(otherNode => mapSoFar.get(otherNode) match {
@@ -170,43 +172,24 @@ object Gray extends App {
           val seqs: Seq[Seq[_]] = Seq(nodesLeft.toSeq, codesLeft.toSeq)
           val choices: Iterator[Seq[_]] = CartesianProductIterable(seqs).iterator
 
-          val best: Option[Map[Node, Code]] = choices.map {
+          choices.flatMap {
             case Seq(node: Node, code: Code) =>
               if (acceptable(node, code)) {
                 //println(s"        ACCEPTABLE:  $node -> $code")
-                val candidate: Map[Node, Code] = solve(nodesLeft - node, codesLeft - code, mapSoFar + (node -> code))
-                //println(s"          candidate size:  ${candidate.size}")
-                if (candidate.size == nodes.size) {
-                  //println(s"          *** FOUND SOLUTION ***")
-                  candidate
-                } else {
-                  NoMapping
-                }
+                val candidate: Option[Map[Node, Code]] = solve(nodesLeft - node, codesLeft - code, mapSoFar + (node -> code))
+                candidate.filter(_.size == nodes.size)
               }
               else {
                 //println(s"        unacceptable:  $node -> $code")
-                NoMapping
+                None
               }
           }.find(_.size == nodes.size)
-
-          best.getOrElse(NoMapping)
         }
 
-        val solution = solve(nodes.toSet, codes.toSet, Map.empty[Node, Code])
-
-        // TODO
-        val result = solution.size == nodes.size
-        if (result) {
-          println(s"    solution:  $solution")
-        }
-        result
+        solve(nodes.toSet, codes.toSet, Map.empty[Node, Code])
       }
 
-      val result = schemas.exists(findEncoding)
-
-      //println("STOP canGray.")
-
-      result
+      schemas.map(scheme => findEncoding(scheme)).find(solnOpt => solnOpt.isDefined && solnOpt.get.size == nodes.size).flatten
     }
 
     def isConnected: Boolean = {
@@ -260,11 +243,11 @@ object Gray extends App {
       Graph(newNodes, newEdges)
     }
 
-    def render(outf: String): Unit = {
+    def render(outf: String, encodingOpt: Option[Map[Node, Code]]): Unit = {
       var pw: PrintWriter = null
       try {
         pw = new PrintWriter(new FileWriter("testCombination.dot"))
-        pw.println(toDot)
+        pw.println(toDot(encodingOpt))
         pw.close()
 
         // render the output graph
@@ -313,12 +296,13 @@ object Gray extends App {
       println(s"  combination $i:  $bits, connected $isConn")
 
       if (isConn) {
-        val canGray = graph.canGray
-        val comb = graph.canonicalForm.toDot.replaceAll("\n", "  ")
+        val encodingOpt = graph.getEncoding
+        val comb = graph.canonicalForm.toDot().replaceAll("\n", "  ")
         if (!ucombs.contains(comb)) {
+          encodingOpt.foreach(encoding => println(s"    encoding:  $encoding"))
           //println(s"  NEW:  $comb")
           // render the output graph
-          //graph.render(s"testCombination_$i.png")
+          graph.render(s"testCombination_$i.png", encodingOpt)
         }
         ucombs.add(comb)
       }
