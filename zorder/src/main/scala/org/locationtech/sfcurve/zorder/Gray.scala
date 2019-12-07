@@ -319,7 +319,7 @@ object Gray extends App {
         if (!ucombs.contains(comb)) {
           if (encodingOpt.isDefined) println(s"    encoding:  ${encodingOpt.get}")
           else println(s"    NO ENCODING FOUND")
-          graph.render(s"testCombination_$i.png", encodingOpt)
+          graph.render(s"testCombination_n${n}_c${i}.png", encodingOpt)
         }
         ucombs.add(comb)
       }
@@ -328,5 +328,5 @@ object Gray extends App {
     numConnected
   }
 
-  generate(4)
+  (1 to 5).foreach(n => generate(n))
 }
