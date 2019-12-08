@@ -27,7 +27,7 @@ object HilbertCurve2DProvider {
   val RESOLUTION_PARAM = "hilbert.resolution"
 }
 
-class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(resolution) with InMemoryRangeConsolidator {
+class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(resolution) with IdentityRangeConsolidator {
   val precision = math.pow(2, resolution).toLong
   val chc = new CompactHilbertCurve(Array(resolution, resolution))
 
@@ -133,7 +133,7 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(resolution) wi
 //    (x, y)
 //  }
 
-  // TODO:  confirm that this returns index ranges in strictly ascending order
+  // the Uzay-Gezen implementation does returns ranges in /descending/ order
   def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
     require(lowerCorner.size == 2)
     val minNormalizedLongitude = lowerCorner.head

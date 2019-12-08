@@ -9,7 +9,7 @@
 package org.locationtech.sfcurve.hilbert
 
 import org.locationtech.sfcurve.Dimensions.{Latitude, Longitude}
-import org.locationtech.sfcurve.{GapMergedIndexRange, RangeComputeHints, SpaceFillingCurves}
+import org.locationtech.sfcurve.{GapMergedIndexRange, IndexRange, RangeComputeHints, SpaceFillingCurves}
 import org.scalatest._
 
 class HilbertCurveSpec extends FunSpec with Matchers {
@@ -74,6 +74,48 @@ class HilbertCurveSpec extends FunSpec with Matchers {
       val value: Long = sfc.toIndex(0.0,0.0)
       print(value)     
 
+    }
+
+    it("Emits query ranges in order") {
+      val sfc = new HilbertCurve2D(8)
+      val hints = new RangeComputeHints
+      hints.put(GapMergedIndexRange.HintsKeyMapGap, 1L.asInstanceOf[AnyRef])
+
+      def validateQueryRanges(x0: Double, x1: Double, y0: Double, y1: Double): Boolean = {
+        val ranges: Seq[IndexRange] = sfc.toRanges(x0, y0, x1, y1, Option(hints))
+        println(f"Number of Hilbert ranges statisfying query X[$x0%1.4f, $x1%1.4f] Y[$y0%1.4f, $y1%1.4f]:  ${ranges.size}%d")
+        ranges.sliding(2, 1).foreach {
+          case Seq(rangePrevious: IndexRange, rangeNext: IndexRange) =>
+            if (rangePrevious.upper <= rangeNext.lower) {
+              println(s"Sliding Hilbert range pair FAILED:  [${rangePrevious.lower}, ${rangePrevious.upper}], [${rangeNext.lower}, ${rangeNext.upper}]")
+              return false
+            }
+        }
+        true
+      }
+
+      // static query to validate (355 ranges)
+      validateQueryRanges(-178.0, 179.0, -86.0, 87.0)
+
+      // static query on a small area
+      //validateQueryRanges(-178.0, -178.0 + 1e-10, -86.0, 87)
+
+      // generator queries to validate
+      for (trial <- 1 to 100) {
+        // NB:  Uzay-Gezen does NOT like it when you query on too small a dimension difference
+        // (it gets unhappy when the X or Y indexes are not different, i.e., [17, 17] is bad)
+        val x0: Double = -180.0 + 1e-10 + Math.random() * 350.0
+        val x1: Double = x0 + 1.0 + (178.0 - x0) * Math.random()
+        val y0: Double = -90.0 + 1e-10 + Math.random() * 170.0
+        val y1: Double = y0 + 1.0 + (88.0 - y0) * Math.random()
+        (x0 < x1) should be(true)
+        (y0 < y1) should be(true)
+        (x0 >= -180.0 && x0 < 180.0) should be(true)
+        (x1 >= -180.0 && x1 < 180.0) should be(true)
+        (y0 >= -90.0 && y0 < 90.0) should be(true)
+        (y1 >= -90.0 && y1 < 90.0) should be(true)
+        validateQueryRanges(x0, x1, y0, y1)
+      }
     }
 
   }
