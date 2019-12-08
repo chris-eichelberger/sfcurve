@@ -76,7 +76,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
 
     }
 
-    it("Emits query ranges in order") {
+    it("Emits query ranges in a consistent order") {
       val sfc = new HilbertCurve2D(8)
       val hints = new RangeComputeHints
       hints.put(GapMergedIndexRange.HintsKeyMapGap, 1L.asInstanceOf[AnyRef])
@@ -102,7 +102,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
 
       // generator queries to validate
       for (trial <- 1 to 100) {
-        // NB:  Uzay-Gezen does NOT like it when you query on too small a dimension difference
+        // NB:  Uzaygezen does NOT like it when you query on too small a dimension difference
         // (it gets unhappy when the X or Y indexes are not different, i.e., [17, 17] is bad)
         val x0: Double = -180.0 + 1e-10 + Math.random() * 350.0
         val x1: Double = x0 + 1.0 + (178.0 - x0) * Math.random()
