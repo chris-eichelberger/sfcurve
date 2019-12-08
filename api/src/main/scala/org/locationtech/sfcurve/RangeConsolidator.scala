@@ -126,42 +126,42 @@ trait InMemoryRangeConsolidator extends RangeConsolidator {
 
   /**
     * To have gotten here, we have already retrieved all of the consolidated
-    * index ranges from all children.  For example, given these raw values:
+    * index ranges from all children.  For example, given these raw values...
     *
-    * Z(
-    * H(x: [-80, -79], y: [38, 39]),  // curve
-    * t: [2018-12-01, 2018-12-31]     // dimension
-    * )
+    *   Z(
+    *     H(x: [-80, -79], y: [38, 39]),  // curve
+    *     t: [2018-12-01, 2018-12-31]     // dimension
+    *   )
     *
     * it might produce these index ranges to be consolidated by the parent
     * Z-order curve (values are made up for example purposes):
     *
-    * Z(
-    * H:  1001-1003, 1021-1023, 2017, 2018, 3001  // curves can return disjoint ranges
-    * t:  65530-65535                             // dimensions return only zero or one contiguous range
-    * )
+    *   Z(
+    *     H:  1001-1003, 1021-1023, 2017, 2018, 3001  // curves can return disjoint ranges
+    *     t:  65530-65535                             // dimensions return only zero or one contiguous range
+    *   )
     *
     * The *naive* process the Z-order curve has to do next is to consider
     * the full cartesian product of the start/stop pairs from its children,
     * and compute the ranges that fall inside, consolidating them as
     * appropriate.  For this case (values are made up for this example):
     *
-    * order_and_consolidate(
-    * Z(1001, 65530) .. Z(1003, 65535) -> 1048572-1048575, 1048604, 1048712-1048800
-    * Z(1021, 65530) .. Z(1023, 65535) -> 11-15, 19-31, 90
-    * Z(2017, 65530) .. Z(2018, 65535) -> 1048605-1048610, 1048620-1048630
-    * Z(3001, 65530) .. Z(3001, 65535) -> 1048619, 91-93
-    * )
+    *   order_and_consolidate(
+    *     Z(1001, 65530) .. Z(1003, 65535) -> 1048572-1048575, 1048604, 1048712-1048800
+    *     Z(1021, 65530) .. Z(1023, 65535) -> 11-15, 19-31, 90
+    *     Z(2017, 65530) .. Z(2018, 65535) -> 1048605-1048610, 1048620-1048630
+    *     Z(3001, 65530) .. Z(3001, 65535) -> 1048619, 91-93
+    *   )
     *
     * would consolidate to this final set of (made up, example!) ranges:
     *
-    * 11-15
-    * 19-31
-    * 90-93
-    * 1048572-1048575
-    * 1048604-1048610
-    * 1048619-1048630
-    * 1048712-1048800
+    *   11-15
+    *   19-31
+    *   90-93
+    *   1048572-1048575
+    *   1048604-1048610
+    *   1048619-1048630
+    *   1048712-1048800
     *
     * This example, by virtue of being made up from whole cloth, does not honor
     * the constraints that you would expect in a real curve.  To wit:

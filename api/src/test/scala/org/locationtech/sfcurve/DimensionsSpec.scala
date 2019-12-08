@@ -19,8 +19,24 @@ class DimensionsSpec extends FunSpec with Matchers {
   describe("date ordering") {
     it("should order dates properly") {
       dateOrdering.equiv(dt3, dt3) should equal(true)
+      dateOrdering.equiv(dt2, dt3) should equal(false)
+      dateOrdering.equiv(dt3, dt2) should equal(false)
+
       dateOrdering.lt(dt0, dt3) should equal(true)
+      dateOrdering.lt(dt3, dt0) should equal(false)
+      dateOrdering.lt(dt3, dt3) should equal(false)
+
       dateOrdering.gt(dt3, dt0) should equal(true)
+      dateOrdering.gt(dt0, dt3) should equal(false)
+      dateOrdering.gt(dt3, dt3) should equal(false)
+
+      dateOrdering.gteq(dt3, dt0) should equal(true)
+      dateOrdering.gteq(dt3, dt3) should equal(true)
+      dateOrdering.gteq(dt0, dt3) should equal(false)
+
+      dateOrdering.lteq(dt0, dt3) should equal(true)
+      dateOrdering.lteq(dt3, dt3) should equal(true)
+      dateOrdering.lteq(dt3, dt0) should equal(false)
     }
   }
 
@@ -33,7 +49,7 @@ class DimensionsSpec extends FunSpec with Matchers {
     }
 
     it("should bound elements properly") {
-      val outerDate = Extent(dt0, dt2, true, false)
+      val outerDate = Extent(dt0, dt2, incMin = true, incMax = false)
       outerDate.contains(dt0) should equal(true)
       outerDate.contains(dt1) should equal(true)
       outerDate.contains(dt2) should equal(false)

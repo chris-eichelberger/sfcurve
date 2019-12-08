@@ -33,7 +33,7 @@ case class GapMergedIndexRange(lower: Long, upper: Long, maxGap: Long) extends I
   // TODO figure out how to thread this value through, if needed
   def contained: Boolean = false
 
-  override def toString(): String = s"GapMergedIndexRange([$lower, $upper], gap $maxGap)"
+  override def toString: String = s"GapMergedIndexRange([$lower, $upper], gap $maxGap)"
 
   def contains(that: GapMergedIndexRange): Boolean =
     (lower + maxGap) <= that.lower && (upper - maxGap) >= that.upper
@@ -85,8 +85,8 @@ object IndexRange {
   */
 abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve {
   // we assume that the cardinality is specified in terms of the number of bits precision
-  val xDimension = Longitude(1L << bitsPrecision)
-  val yDimension = Latitude(1L << bitsPrecision)
+  val xDimension: Longitude = Longitude(1L << bitsPrecision)
+  val yDimension: Latitude = Latitude(1L << bitsPrecision)
   val children: Vector[Discretizor] = Vector(xDimension, yDimension)
 
   @deprecated("use 'index' instead", "SFCurve 2.0")

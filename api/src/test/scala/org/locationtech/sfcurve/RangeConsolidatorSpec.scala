@@ -5,7 +5,7 @@ import org.scalatest.{FunSpec, Matchers}
 import GapMergedIndexRange._
 
 class RangeConsolidatorSpec extends FunSpec with Matchers {
-  implicit def pairToRange(pair: (Long, Long)): IndexRange = IndexRange(pair._1, pair._2, false)
+  implicit def pairToRange(pair: (Long, Long)): IndexRange = IndexRange(pair._1, pair._2, contained = false)
 
   val rawRangesOne: Seq[(Long, Long)] = Seq(
     (3, 5),
@@ -47,7 +47,7 @@ class RangeConsolidatorSpec extends FunSpec with Matchers {
 
   def consolidateRangesBothWays(ranges: Seq[(Long, Long)], name: String, maxGap: Long): Int = {
     val forwards = consolidateRanges(ranges, name, maxGap)
-    val backwards = consolidateRanges(ranges, s"$name, Reverse", maxGap)
+    val backwards = consolidateRanges(ranges.reverse, s"$name, Reverse", maxGap)
     if (forwards == backwards) forwards else -1
   }
 
