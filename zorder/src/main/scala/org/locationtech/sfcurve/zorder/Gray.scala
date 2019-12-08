@@ -197,6 +197,7 @@ object Gray extends App {
     }
 
     def isConnected: Boolean = {
+      if (nodes.size == 1) return true
       var node = firstNode
       var cnxs: Set[Node] = connections(node)
       if (cnxs.size < 1) return false
@@ -283,6 +284,10 @@ object Gray extends App {
 
     def simplifyEncoding(encodingOpt: Option[Map[Node, Code]]): Option[Map[Node, Code]] = {
       encodingOpt.map(encoding => {
+        if (encoding.keys.size == 1) {
+          return Option(Map[Node, Code](encoding.keys.head -> Code(Vector(0))))
+        }
+
         val codes: Seq[Code] = encoding.values.toSeq
         val numPlaces = codes.head.values.size
         val placesToKeep: Vector[Boolean] = (0 until numPlaces).map(place => {
@@ -332,5 +337,5 @@ object Gray extends App {
     numConnected
   }
 
-  (1 to 5).foreach(n => generate(n))
+  (1 to 1).foreach(n => generate(n))
 }
