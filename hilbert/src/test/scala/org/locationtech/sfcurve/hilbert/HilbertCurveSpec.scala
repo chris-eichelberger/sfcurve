@@ -83,7 +83,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
 
       def validateQueryRanges(x0: Double, x1: Double, y0: Double, y1: Double): Boolean = {
         val ranges: Seq[IndexRange] = sfc.toRanges(x0, y0, x1, y1, Option(hints))
-        println(f"Number of Hilbert ranges statisfying query X[$x0%1.4f, $x1%1.4f] Y[$y0%1.4f, $y1%1.4f]:  ${ranges.size}%d")
+        println(f"Number of Hilbert ranges satisfying query X[$x0%1.4f, $x1%1.4f] Y[$y0%1.4f, $y1%1.4f]:  ${ranges.size}%d")
         ranges.sliding(2, 1).foreach {
           case Seq(rangePrevious: IndexRange, rangeNext: IndexRange) =>
             if (rangePrevious.upper <= rangeNext.lower) {
