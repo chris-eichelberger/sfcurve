@@ -52,7 +52,7 @@ class ZCurve2DSpec extends FunSpec with Matchers {
 
       def validateQueryRanges(x0: Double, x1: Double, y0: Double, y1: Double): Boolean = {
         val ranges: Seq[IndexRange] = sfc.toRanges(x0, y0, x1, y1, Option(hints))
-        println(f"Number of Z-order ranges satisfying query X[$x0%1.4f, $x1%1.4f] Y[$y0%1.4f, $y1%1.4f]:  ${ranges.size}%d")
+        println(f"Number of 2D Z-order ranges satisfying query X[$x0%1.4f, $x1%1.4f] Y[$y0%1.4f, $y1%1.4f]:  ${ranges.size}%d")
         val windows: List[Seq[IndexRange]] = ranges.sliding(2, 1).toList
         if (windows.size == 1) return true
         windows.foreach {
@@ -65,7 +65,7 @@ class ZCurve2DSpec extends FunSpec with Matchers {
         true
       }
 
-      // static query to validate (355 ranges)
+      // static query to validate a large area
       validateQueryRanges(-178.0, 179.0, -86.0, 87.0) should be(true)
 
       // static query on a small area

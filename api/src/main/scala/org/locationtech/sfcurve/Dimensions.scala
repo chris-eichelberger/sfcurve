@@ -167,12 +167,31 @@ object Dimensions {
   // defined over [0.0, 180.0)
   case class NonNegativeLatitude(cardinality: Long) extends Dimension[Double] {
     val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](0.0, 180.0, incMin = true, incMax = true)
+    val extent: Extent[Double] = Extent[Double](0.0, 180.0, incMin = true, incMax = false)
     override def normalize(value: Double): Double = {
       var v = value
       while (v < 0.0) v += 180.0
       while (v > 180.0) v -= 180.0
       v
+    }
+  }
+
+  case class AltitudeInMeters(cardinality: Long) extends Dimension[Double] {
+    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
+    val extent: Extent[Double] = Extent[Double](-11000.0, 17000.0, incMin = true, incMax = false)
+    override def normalize(value: Double): Double = {
+      if (!extent.contains(value)) throw new Exception(s"Invalid altitude in meters:  $value")
+      value
+    }
+  }
+
+  // defined over [1970-01-01, 2070-01-01)
+  case class ExampleEra(cardinality: Long) extends Dimension[Date] {
+    val ev: DimensionLike[Date] = implicitly[DimensionLike[Date]]
+    val extent: Extent[Date] = Extent[Date](new Date(1970, 0, 1), new Date(2070, 0, 1), incMin = true, incMax = false)
+    override def normalize(value: Date): Date = {
+      if (!extent.contains(value)) throw new Exception(s"Invalid date within the era:  $value")
+      value
     }
   }
 

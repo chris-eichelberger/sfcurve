@@ -8,7 +8,9 @@
 
 package org.locationtech.sfcurve
 
-import org.locationtech.sfcurve.Dimensions.{Cell, Dimension, DimensionLike, Discretizor, Extent, Latitude, Longitude, NonNegativeLatitude, NonNegativeLongitude, SpaceFillingCurve}
+import org.locationtech.sfcurve.Dimensions.{AltitudeInMeters, Cell, Dimension, DimensionLike, Discretizor, Extent, Latitude, Longitude, NonNegativeLatitude, NonNegativeLongitude, SpaceFillingCurve}
+
+import scala.util.Try
 
 class RangeComputeHints extends java.util.HashMap[String, AnyRef]
 
@@ -106,5 +108,39 @@ abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve
     val extXOpt = Option(Extent[Double](xmin, xmax))
     val extYOpt = Option(Extent[Double](ymin, ymax))
     queryRanges(Seq(extXOpt, extYOpt), hints).toSeq
+  }
+}
+
+/**
+  *
+  * @param bitsPrecision the number of bits to use PER DIMENSION to determine cardinality;
+  *                      curve_cardinality = num_dimensions * (1 << bitsPrecision)
+  */
+abstract class SpaceFillingCurve3D(bitsPrecision: Int) extends SpaceFillingCurve {
+  // we assume that the cardinality is specified in terms of the number of bits precision
+  val xDimension: Longitude = Longitude(1L << bitsPrecision)
+  val yDimension: Latitude = Latitude(1L << bitsPrecision)
+  val zDimension: AltitudeInMeters = AltitudeInMeters(1L << bitsPrecision)
+  val children: Vector[Discretizor] = Vector(xDimension, yDimension, zDimension)
+
+  @deprecated("use 'index' instead", "SFCurve 2.0")
+  def toIndex(x: Double, y: Double, z: Double): Long = fold(Seq(xDimension.toBin(x), yDimension.toBin(y), zDimension.toBin(y)))
+
+  @deprecated("use 'inverseIndex' instead", "SFCurve 2.0")
+  def toPoint(i: Long): (Double, Double, Double) = {
+    val cell = inverseIndex(i)
+    (
+      cell.extents.headOption.map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get,
+      Try(cell.extents(1)).map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get,
+      cell.extents.lastOption.map(a => 0.5 * (a.min.asInstanceOf[Double] + a.max.asInstanceOf[Double])).get
+    )
+  }
+
+  @deprecated("use 'indexRanges' instead", "SFCurve 2.0")
+  def toRanges(xmin: Double, ymin: Double, zmin: Double, xmax: Double, ymax: Double, zmax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    val extXOpt = Option(Extent[Double](xmin, xmax))
+    val extYOpt = Option(Extent[Double](ymin, ymax))
+    val extZOpt = Option(Extent[Double](zmin, zmax))
+    queryRanges(Seq(extXOpt, extYOpt, extZOpt), hints).toSeq
   }
 }
