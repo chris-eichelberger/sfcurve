@@ -27,9 +27,10 @@ object HilbertCurve2DProvider {
   val RESOLUTION_PARAM = "hilbert.resolution"
 }
 
-class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(resolution) with IdentityRangeConsolidator {
-  val precision: Long = math.pow(2, resolution).toLong
-  val chc = new CompactHilbertCurve(Array(resolution, resolution))
+class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bitsFromCardinality(resolution).toInt) with IdentityRangeConsolidator {
+  val bitsPerDimension: Int = Dimensions.bitsFromCardinality(resolution).toInt
+  val precision: Long = resolution
+  val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))
 
   def fold(subordinates: Seq[Long]): Long = {
     require(subordinates.length == 2)

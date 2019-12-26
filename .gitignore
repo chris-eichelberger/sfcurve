@@ -39,3 +39,4 @@ project/target
 **/test*.txt
 **/test*.dot
 **/*.png
+/test-distance.csv
