@@ -142,6 +142,7 @@ object Locality extends App {
         val p = sfc.toPoint(counter)
         Point(Degrees(p._1), Degrees(p._2))
       case tri: Triangle =>
+        require(state != null, s"'state' was <NULL> unexpectedly for counter $counter (< cardinality $cardinality)")
         val result = Point(Degrees(state.asInstanceOf[Triangle].xMid), Degrees(state.asInstanceOf[Triangle].yMid))
         result
     }
@@ -173,7 +174,7 @@ object Locality extends App {
   }
 
   // set up
-  val bitsPrecision: Long = 6
+  val bitsPrecision: Long = 24
   val cardinality = 1L << bitsPrecision
   val cardPerDim = 1L << (bitsPrecision >> 1L)
   println(s"Bits precision $bitsPrecision, cardinality $cardinality")
@@ -181,6 +182,10 @@ object Locality extends App {
   println(s"Z2 cardinality ${z2.cardinality}")
   val h2 = new HilbertCurve2D(cardPerDim.toInt)
   println(s"H2 cardinality ${h2.cardinality}")
+  val TriangleDepth = bitsPrecision.toInt / 3
+  val t2 = TriN.createLowestIndex(TriangleDepth)
+  println(s"Triangle depth:  ${TriangleDepth}")
+  println(s"Triangle cardinality:  ${t2.cardinality}")
 
   // unit testing
   val point = Point(Degrees(-78.0), Degrees(38.0))
@@ -197,6 +202,10 @@ object Locality extends App {
   assert(dBitstring("100", "100") == 0.0)
   assert(dBitstring("110", "100") == 0.25)
   assert(dBitstring("100", "101") == 0.125)
+  assert(TriN.createLowestIndex(1).cardinality == 8)
+  assert(TriN.createLowestIndex(2).cardinality == 32)
+  assert(TriN.createLowestIndex(3).cardinality == 128)
+  assert(TriN.createLowestIndex(4).cardinality == 512)
 
   // application
   // =CORREL($C$2:$C$100001,D$2:D$100001)
@@ -214,14 +223,12 @@ object Locality extends App {
 
 
   var ps: PrintStream = null
-  try {
-    val TriangleDepth = bitsPrecision.toInt / 3
-
-    CellIterator("Z2", z2).exhaust(ps)
-    CellIterator("H2", h2).exhaust(ps)
+//  try {
+    //CellIterator("Z2", z2).exhaust(ps)
+    //CellIterator("H2", h2).exhaust(ps)
     CellIterator("triangle", TriN.createLowestIndex(TriangleDepth)).exhaust(ps)
-  } catch { case t: Throwable =>
-    ps.close()
-  }
+//  } catch { case t: Throwable =>
+//    ps.close()
+//  }
 
 }

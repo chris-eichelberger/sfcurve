@@ -42,7 +42,7 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
   val yMid: Double = 0.5 * (y0 + y1)
 
-  val cardinality: Long = (depth - 1) << 5L
+  val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
 
   def bitString: String = indexBinaryString(index, depth)
 
@@ -62,6 +62,7 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
 
   def next: Option[Triangle] = {
+    //println(s"Triangle.next from $bitString...")
     val transitions: Vector[Int] = bitString.sliding(3,3).map(bbb => BitStrings(bbb)).toVector
     var i = transitions.length - 1
     var result: Option[Triangle] = None
