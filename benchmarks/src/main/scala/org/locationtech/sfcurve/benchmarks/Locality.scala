@@ -169,7 +169,16 @@ object Locality extends App {
 
   def generatePoint: Point = Point(generateLongitude, generateLatitude)
 
-  def generatePoints: Points = Points(generatePoint, generatePoint)
+  def generatePoints(sizeDegreesOpt: Option[Double] = None): Points = sizeDegreesOpt match {
+    case Some(sizeDegrees) =>
+      val x0: Double = 0.5 + Math.random() * (359.0 - sizeDegrees) - 180.0
+      val y0: Double = 0.5 + Math.random() * (179.0 - sizeDegrees) - 90.0
+      val x1: Double = x0 + sizeDegrees
+      val y1: Double = y0 + sizeDegrees
+      Points(Point(Degrees(x0), Degrees(y0)), Point(Degrees(x1), Degrees(y1)))
+    case None =>
+      Points(generatePoint, generatePoint)
+  }
 
   trait Sampler extends Iterator[Points]
 
@@ -231,7 +240,16 @@ object Locality extends App {
   case class RandomSample(numPoints: Long) extends Sampler {
     var counter: Long = 0
     def hasNext: Boolean = counter < numPoints
-    def next(): Points = { counter = counter + 1; generatePoints }
+    def next(): Points = { counter = counter + 1; generatePoints() }
+  }
+
+  case class QuerySampler(numPoints: Long, sizeDegrees: Double) extends Sampler {
+    var counter: Long = 0
+    def hasNext: Boolean = counter < numPoints
+    def next(): Points = {
+      counter = counter + 1
+      generatePoints(Option(sizeDegrees))
+    }
   }
 
   abstract class Aggregator(sampler: Sampler, verbose: Boolean, curves: Curve*) {
@@ -252,8 +270,17 @@ object Locality extends App {
     }
   }
 
+  def numQueryRanges(curve: Curve, query: Points): Long = {
+    val x0: Double = Math.min(query.a.x.degrees, query.b.x.degrees)
+    val y0: Double = Math.min(query.a.y.degrees, query.b.y.degrees)
+    val x1: Double = Math.max(query.a.x.degrees, query.b.x.degrees)
+    val y1: Double = Math.max(query.a.y.degrees, query.b.y.degrees)
+    val ranges = curve.toRanges(x0, y0, x1, y1, None)
+    ranges.size
+  }
+
   case class Table(sampler: Sampler, verbose: Boolean, curves: Curve*) extends Aggregator(sampler, verbose, curves:_*) {
-    val columns = Seq("plane", "sphere", "index")
+    val columns = Seq("plane", "sphere", "index", "nqr")
     val allcols: Seq[String] = CartesianProductIterable(Seq(columns, curves.map(_.name))).iterator.toSeq.map(_.mkString("_"))
     def exhaust(ps: PrintStream): Unit = {
       ps.println("from_wkt,to_wkt,plane,sphere," + allcols.mkString(","))
@@ -261,8 +288,9 @@ object Locality extends App {
         val sample = sampler.next()
         ps.print(s"${sample.a.wkt},${sample.b.wkt},${sample.dPlane()},${sample.dSphere()}")
         distances.foreach {
-          case (_, dists) =>
+          case (curve, dists) =>
             ps.print("," + dists.csvLine(sample, verbose = verbose))
+            ps.print("," + numQueryRanges(curve, sample))
         }
         ps.println()
       }
@@ -270,7 +298,7 @@ object Locality extends App {
   }
 
   // set up
-  val bitsPrecision: Long = 12
+  val bitsPrecision: Long = 6
   require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
@@ -343,6 +371,10 @@ object Locality extends App {
   val numRandomPoints: Long = 100
   val random = Seq(RandomSample(numRandomPoints))
 
+  val numRandomQueries: Long = 1
+  val querySizeDegrees: Double = 1.0
+  val queries = Seq(QuerySampler(numRandomQueries, querySizeDegrees))
+
   val CharlottesvillePoints = Seq[Points](
     Points(
       Point(Degrees(-78.495150), Degrees(38.075776)),  // CCRi
@@ -351,7 +383,7 @@ object Locality extends App {
   )
   val cville = Seq(FixedSample(CharlottesvillePoints))
 
-  val samplers: Seq[Sampler] = random
+  val samplers: Seq[Sampler] = queries
 
   for (sampler <- samplers) {
     Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)

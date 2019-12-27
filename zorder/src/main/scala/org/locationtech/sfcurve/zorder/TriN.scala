@@ -425,11 +425,15 @@ object TriN {
   }
 
   def overlaps(triangle: Triangle, xmin: Double, xmax: Double, ymin: Double, ymax: Double): Boolean = {
+    val txmin = Math.min(triangle.x0, triangle.x1)
+    val txmax = Math.max(triangle.x0, triangle.x1)
+    val tymin = Math.min(triangle.y0, triangle.y1)
+    val tymax = Math.max(triangle.y0, triangle.y1)
     // easy exclusions
-    if (triangle.x1 < xmin) return false
-    if (triangle.x0 > xmax) return false
-    if (triangle.y1 < ymin) return false
-    if (triangle.y0 > ymax) return false
+    if (txmax < xmin) return false
+    if (txmin > xmax) return false
+    if (tymax < ymin) return false
+    if (tymin > ymax) return false
     // TODO make this more refined; it's not necessary that they overlap at this point, because of the angles
     true
   }

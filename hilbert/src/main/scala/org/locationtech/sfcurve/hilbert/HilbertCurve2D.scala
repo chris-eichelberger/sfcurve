@@ -80,6 +80,12 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
     val maxNormalizedLongitude = upperCorner.head
     val maxNormalizedLatitude = upperCorner.last
 
+    // dummy check for a single-cell overlap (which Uzaygezen does /not/ like)
+    if (minNormalizedLongitude == maxNormalizedLongitude && minNormalizedLatitude == maxNormalizedLatitude) {
+      val idx = fold(Seq(minNormalizedLongitude, minNormalizedLatitude))
+      return Seq(IndexRange(idx, idx, contained = true))
+    }
+
     val chc = new CompactHilbertCurve(Array[Int](resolution, resolution))
     val region = new java.util.ArrayList[LongRange]()
 
