@@ -56,14 +56,25 @@ object Locality extends App {
     }
 
     def dSphere(verbose: Boolean = false): Double = {
-      val x0 = a.x.radians
-      val y0 = a.y.radians
-      val x1 = b.x.radians
-      val y1 = b.y.radians
-      val result = Math.acos(Math.sin(y0) * Math.sin(y1) + Math.cos(y0) * Math.cos(y1) * Math.cos(Math.abs(x1 - x0))) / Math.PI
+      val lambda1 = a.x.radians
+      val phi1 = a.y.radians
+      val lambda2 = b.x.radians
+      val phi2 = b.y.radians
+
+      val dLambda = Math.abs(lambda1 - lambda2)
+      val dPhi = Math.abs(phi1 - phi2)
+
+      val numerator = Math.sqrt(Math.pow(Math.cos(phi2) * Math.sin(dLambda), 2.0) + Math.pow(Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda), 2.0))
+      val denominator = Math.sin(phi1) * Math.sin(phi2) + Math.cos(phi1) * Math.cos(phi2) * Math.cos(dLambda)
+      val rads = Math.atan2(numerator, denominator)
+      val prads = 0.5 * rads / Math.PI
+
+      //println(s"l1 $lambda1, p1 $phi1, l2 $lambda2, p2 $phi2, numerator $numerator, denominator $denominator, rads $rads, prads $prads")
+      val result = prads
       if (verbose) {
         println(s"dSphere:  ${a.wkt} to ${b.wkt} = $result")
       }
+      assert(!result.isNaN, s"dSphere value is NaN for ${a.wkt} to ${b.wkt}")
       result
     }
 
@@ -224,7 +235,7 @@ object Locality extends App {
   }
 
   // set up
-  val bitsPrecision: Long = 54
+  val bitsPrecision: Long = 12
   require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
@@ -259,6 +270,17 @@ object Locality extends App {
   assert(TriN.createLowestIndex(3).cardinality == 128)
   assert(TriN.createLowestIndex(4).cardinality == 512)
 
+  // more unit tests
+  {
+    println(s"Triangle unit tests...")
+    val idx = t2.toIndex(-78.495150, 38.075776)
+    println(s"  Index CCRi:  $idx")
+    val t = t2.toPoint(idx)
+    println(s"  From index:  $t")
+    assert(Math.abs(t._1 - -78.495150) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
+    assert(Math.abs(t._2 - 38.075776) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
+  }
+
   // application
   // =CORREL($C$2:$C$100001,D$2:D$100001)
   // Z2	H2	tri
@@ -274,7 +296,7 @@ object Locality extends App {
   //0.715148242	0.238397849	0.740885343
 
 
-  var ps: PrintStream = null
+  var ps: PrintStream = System.out
 
   val exhaustive = Seq[Sampler](
     CellIterator("Z2", z2),
@@ -301,15 +323,9 @@ object Locality extends App {
     FixedSample("T2", t2, CharlottesvillePoints)
   )
 
-  val samples: Seq[Sampler] = cville
+  val samples: Seq[Sampler] = random
 
   for (sample <- samples) {
-    Summary(sample, verbose = true).exhaust(ps)
+    Summary(sample, verbose = false).exhaust(ps)
   }
-
-//  try {
-//  } catch { case t: Throwable =>
-//    ps.close()
-//  }
-
 }

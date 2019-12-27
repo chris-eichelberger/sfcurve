@@ -48,14 +48,15 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   def bitString: String = indexBinaryString(index, depth)
 
   def xtInverse: Double = {
-    val result = TriN.getXTInv(xMid, yMid, X)
-    println(s"xtInverse($xMid, $yMid, $X) -> $result")
+    val t0 = TriN.getInitialTriangle(xMid, yMid)
+    val result = TriN.getXTInv(xMid, yMid, t0.X)
+    //println(s"xtInverse($xMid, $yMid, $X) -> $result")
     result
   }
 
   // degenerate for the Curve contract
   override def toIndex(x: Double, y: Double): Long = {
-    TriN.index(xtInverse, y, depth)
+    TriN.index(x, y, depth)
   }
 
   // degenerate for the Curve contract
