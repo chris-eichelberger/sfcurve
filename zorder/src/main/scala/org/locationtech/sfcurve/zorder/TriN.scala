@@ -60,19 +60,17 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
 
   def next: Option[Triangle] = {
-    val transitions: Vector[Int] = bitString.sliding(3,3).map(bbb => TransitionBitStrings(bbb)).toVector
+    val transitions: Vector[Int] = bitString.sliding(3,3).map(bbb => BitStrings(bbb)).toVector
     var i = transitions.length - 1
     var result: Option[Triangle] = None
-    println(s"transitions:  $transitions")
     while (i >= 0) {
       val t = transitions(i)
       if (i == 0) {
-        if (t >= 8) return None
+        if (t >= 7) return None
         val nextTransitions: Seq[Int] = Vector(t + 1) ++ Vector.fill(transitions.length - i - 1)(TransCenter)
         val nextIndex: Long = nextTransitions.foldLeft(0L)((acc, t) => {
           (acc << 3L) | t
         })
-        println(s"next top-level transitions:  $nextTransitions, index $nextIndex")
         return Option(invIndex(nextIndex, depth))
       } else {
         if (NextTransition.contains(t)) {
@@ -80,7 +78,6 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
           val nextIndex: Long = nextTransitions.foldLeft(0L)((acc, t) => {
             (acc << 3L) | t
           })
-          println(s"next sub-surface transitions:  $nextTransitions, index $nextIndex")
           return Option(invIndex(nextIndex, depth))
         }
       }
@@ -217,7 +214,7 @@ object TriN {
 
   val Transitions: Set[Int] = Set(TransCenter, TransApex, TransLR, TransLL)
 
-  val TransitionBitStrings: Map[String, Int] = Transitions.map(transition => {
+  val BitStrings: Map[String, Int] = (0 to 7).map(transition => {
     (transition.toBinaryString.reverse.padTo(3, "0").reverse.mkString(""), transition)
   }).toMap
 
@@ -432,9 +429,7 @@ object TriN {
     val octYi = (octIdx >> 2) & 1
     val x0 = octXi * 90.0 - 180.0
     val y0 = octYi * 90.0 - 90.0
-    println(s"  octIdx:  $octIdx, i($octXi, $octYi), X $x0, Y $y0")
     val t0: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
-    println(s"    t:  $t0")
 
     (depth - 2  to 0 by -1).foldLeft(t0)((acc, i) => {
       val corner = (idx >> (3 * i)) & 7
