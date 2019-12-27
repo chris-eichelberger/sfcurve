@@ -2,6 +2,8 @@ package org.locationtech.sfcurve.benchmarks
 
 import java.io.{FileOutputStream, FileWriter, PrintStream}
 
+import org.locationtech.sfcurve.Utilities.CartesianProductIterable
+
 import scala.collection.mutable.{Map => MutableMap}
 import org.locationtech.sfcurve.hilbert.HilbertCurve2D
 import org.locationtech.sfcurve.zorder.{TriN, Triangle, ZCurve2D}
@@ -9,6 +11,7 @@ import org.locationtech.sfcurve.{Dimensions, IndexRange, RangeComputeHints, Spac
 
 object Locality extends App {
   type Curve = {
+    def name: String
     def cardinality: Long;
     def toIndex(x: Double, y: Double): Long;
     def toPoint(index: Long): (Double, Double);
@@ -132,6 +135,17 @@ object Locality extends App {
       acc("index", indexDistance)
     }
 
+    def csvLine(rawPoints: Points, verbose: Boolean = false): String = {
+      val points: Points = cellPoints(rawPoints)
+      val dplane = points.dPlane(verbose = verbose)
+      val dsphere = points.dSphere(verbose = verbose)
+      val dindex = curve match {
+        case tri: Triangle => points.dTriangle(tri.depth, verbose = verbose)
+        case sfc: SpaceFillingCurve2D => points.dIndex(sfc, verbose = verbose)
+      }
+      s"$dplane,$dsphere,$dindex"
+    }
+
     def summarize(ps: PrintStream): Unit =
     {
       println(s"\n$name distances...")
@@ -157,10 +171,7 @@ object Locality extends App {
 
   def generatePoints: Points = Points(generatePoint, generatePoint)
 
-  trait Sampler extends Iterator[Points] {
-    def name: String
-    def curve: Curve
-  }
+  trait Sampler extends Iterator[Points]
 
   case class CellIterator(name: String, curve: Curve) extends Sampler {
     val cardinality: Long = curve.cardinality
@@ -211,26 +222,50 @@ object Locality extends App {
     }
   }
 
-  case class FixedSample(name: String, curve: Curve, input: Seq[Points]) extends Sampler {
+  case class FixedSample(input: Seq[Points]) extends Sampler {
     val itr: Iterator[Points] = input.iterator
     def hasNext: Boolean = itr.hasNext
     def next(): Points = itr.next()
   }
 
-  case class RandomSample(name: String, curve: Curve, numPoints: Long) extends Sampler {
+  case class RandomSample(numPoints: Long) extends Sampler {
     var counter: Long = 0
     def hasNext: Boolean = counter < numPoints
     def next(): Points = { counter = counter + 1; generatePoints }
   }
 
-  case class Summary(sampler: Sampler, verbose: Boolean = false) {
-    val distances: Distances = Distances(sampler.name, sampler.curve)
+  abstract class Aggregator(sampler: Sampler, verbose: Boolean, curves: Curve*) {
+    val distances: Map[Curve,Distances] = curves.map(curve => curve -> Distances(curve.name, curve)).toMap
 
+  }
+
+  case class Summary(sampler: Sampler, verbose: Boolean, curves: Curve*) extends Aggregator(sampler, verbose, curves:_*) {
     def exhaust(ps: PrintStream): Unit = {
       while (sampler.hasNext) {
-        distances.accumulate(sampler.next(), verbose = verbose)
+        val sample = sampler.next()
+        distances.map {
+          case (_, dists) =>
+            dists.accumulate(sample, verbose = verbose)
+        }
       }
-      distances.summarize(ps)
+      distances.foreach { case (_, dists) => dists.summarize(ps) }
+    }
+  }
+
+  case class Table(sampler: Sampler, verbose: Boolean, curves: Curve*) extends Aggregator(sampler, verbose, curves:_*) {
+    val columns = Seq("plane", "sphere", "index")
+    val allcols: Seq[String] = CartesianProductIterable(Seq(columns, curves.map(_.name))).iterator.toSeq.map(_.mkString("_"))
+    def exhaust(ps: PrintStream): Unit = {
+      ps.println("from_wkt,to_wkt," + allcols.mkString(","))
+      while (sampler.hasNext) {
+        val sample = sampler.next()
+        ps.print(s"${sample.a.wkt},${sample.b.wkt}")
+        distances.foreach {
+          case (_, dists) =>
+            ps.print("," + dists.csvLine(sample, verbose = verbose))
+        }
+        ps.println()
+      }
     }
   }
 
@@ -296,7 +331,8 @@ object Locality extends App {
   //0.715148242	0.238397849	0.740885343
 
 
-  var ps: PrintStream = System.out
+  //var ps: PrintStream = System.out
+  var ps: PrintStream = new PrintStream(new FileOutputStream("test-distance.csv"))
 
   val exhaustive = Seq[Sampler](
     CellIterator("Z2", z2),
@@ -304,12 +340,8 @@ object Locality extends App {
     CellIterator("T2", t2)
   )
 
-  val numRandomPoints: Long = 10000
-  val random = Seq[Sampler](
-    RandomSample("Z2", z2, numRandomPoints),
-    RandomSample("H2", h2, numRandomPoints),
-    RandomSample("T2", t2, numRandomPoints)
-  )
+  val numRandomPoints: Long = 100
+  val random = Seq(RandomSample(numRandomPoints))
 
   val CharlottesvillePoints = Seq[Points](
     Points(
@@ -317,15 +349,13 @@ object Locality extends App {
       Point(Degrees(-78.688256), Degrees(38.054444))  // Eichelberger
     )
   )
-  val cville = Seq[Sampler](
-    FixedSample("Z2", z2, CharlottesvillePoints),
-    FixedSample("H2", h2, CharlottesvillePoints),
-    FixedSample("T2", t2, CharlottesvillePoints)
-  )
+  val cville = Seq(FixedSample(CharlottesvillePoints))
 
-  val samples: Seq[Sampler] = random
+  val samplers: Seq[Sampler] = random
 
-  for (sample <- samples) {
-    Summary(sample, verbose = false).exhaust(ps)
+  for (sampler <- samplers) {
+    Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
   }
+
+  ps.close()
 }

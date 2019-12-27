@@ -34,6 +34,8 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
   val precision: Long = resolution
   val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))
 
+  val name: String = "Hilbert"
+
   def fold(subordinates: Seq[Long]): Long = {
     require(subordinates.length == 2)
 

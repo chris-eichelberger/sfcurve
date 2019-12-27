@@ -45,6 +45,8 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   override val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
 
+  val name: String = "Triangle"
+
   def bitString: String = indexBinaryString(index, depth)
 
   def xtInverse: Double = {

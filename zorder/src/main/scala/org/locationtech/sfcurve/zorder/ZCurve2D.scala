@@ -22,6 +22,8 @@ import scala.util.Try
 class ZCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bitsFromCardinality(resolution).toInt)
   with IdentityRangeConsolidator {
 
+  val name: String = "ZOrder"
+
   override def fold(subordinates: Seq[Long]): Long = Z2(subordinates.head.toInt, subordinates.last.toInt).z
 
   override def unfold(index: Long): Vector[Long] = {
