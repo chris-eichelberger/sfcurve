@@ -276,7 +276,9 @@ object Locality extends App {
     val x1: Double = Math.max(query.a.x.degrees, query.b.x.degrees)
     val y1: Double = Math.max(query.a.y.degrees, query.b.y.degrees)
     val ranges = curve.toRanges(x0, y0, x1, y1, None)
-    ranges.size
+    val result = ranges.size
+    assert(result > 0, s"Curve ${curve.name} cardinality ${curve.cardinality} has an empty range over X($x0, $x1) Y($y0, $y1)!")
+    result
   }
 
   case class Table(sampler: Sampler, verbose: Boolean, curves: Curve*) extends Aggregator(sampler, verbose, curves:_*) {
@@ -298,7 +300,7 @@ object Locality extends App {
   }
 
   // set up
-  val bitsPrecision: Long = 6
+  val bitsPrecision: Long = 12
   require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
@@ -371,7 +373,7 @@ object Locality extends App {
   val numRandomPoints: Long = 100
   val random = Seq(RandomSample(numRandomPoints))
 
-  val numRandomQueries: Long = 1
+  val numRandomQueries: Long = 10
   val querySizeDegrees: Double = 1.0
   val queries = Seq(QuerySampler(numRandomQueries, querySizeDegrees))
 

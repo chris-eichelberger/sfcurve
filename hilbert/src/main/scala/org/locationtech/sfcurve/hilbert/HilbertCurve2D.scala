@@ -86,6 +86,25 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
       return Seq(IndexRange(idx, idx, contained = true))
     }
 
+    // dummy check for a single-cell strip (which Uzaygezen does /not/ like)
+    if (minNormalizedLongitude == maxNormalizedLongitude) {
+      // vertical strip
+      return (for (normalizedLat <- minNormalizedLatitude to maxNormalizedLatitude) yield {
+        val idx = fold(Seq(minNormalizedLongitude, normalizedLat))
+        IndexRange(idx, idx, contained = true)
+      }).toSeq
+    }
+    if (minNormalizedLatitude == maxNormalizedLatitude) {
+      // horizontal strip
+      return (for (normalizedLon <- minNormalizedLongitude to maxNormalizedLongitude) yield {
+        val idx = fold(Seq(normalizedLon, minNormalizedLatitude))
+        IndexRange(idx, idx, contained = true)
+      }).toSeq
+    }
+    if (minNormalizedLongitude == maxNormalizedLongitude || minNormalizedLatitude == maxNormalizedLatitude) {
+      throw new Exception(s"Single-cell strip should not be possible:  long ($minNormalizedLongitude, $maxNormalizedLongitude), lat ($minNormalizedLatitude, $maxNormalizedLatitude)")
+    }
+
     val chc = new CompactHilbertCurve(Array[Int](resolution, resolution))
     val region = new java.util.ArrayList[LongRange]()
 
