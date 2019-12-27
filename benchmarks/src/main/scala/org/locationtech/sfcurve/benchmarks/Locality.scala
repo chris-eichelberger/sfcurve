@@ -300,32 +300,34 @@ object Locality extends App {
   }
 
   // set up
-  val bitsPrecision: Long = 12
+  println("Setting up...")
+  val bitsPrecision: Long = 18
   require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
   val cardPerDim = 1L << (bitsPrecision >> 1L)
-  println(s"Bits precision $bitsPrecision, cardinality $cardinality")
+  println(s"  Bits precision $bitsPrecision, cardinality $cardinality")
   val z2 = new ZCurve2D(cardPerDim.toInt)
-  println(s"Z2 cardinality ${z2.cardinality}")
+  println(s"  Z2 cardinality ${z2.cardinality}")
   val h2 = new HilbertCurve2D(cardPerDim.toInt)
-  println(s"H2 cardinality ${h2.cardinality}")
+  println(s"  H2 cardinality ${h2.cardinality}")
   val TriangleDepth = bitsPrecision.toInt / 3
   val t2 = TriN.createLowestIndex(TriangleDepth)
-  println(s"Triangle depth:  ${TriangleDepth}")
-  println(s"Triangle cardinality:  ${t2.cardinality}")
+  println(s"  Triangle depth:  ${TriangleDepth}")
+  println(s"  Triangle cardinality:  ${t2.cardinality}")
 
   // unit testing
+  println("\nUnit test results...")
   val point = Point(Degrees(-78.0), Degrees(38.0))
   val points = Points(point, point)
   val dIndexZ2 = points.dIndex(z2)
-  println(s"dIndex(z2):  $dIndexZ2")
+  println(s"  dIndex(z2):  $dIndexZ2")
   assert(dIndexZ2 == 0.0)
   val dIndexH2 = points.dIndex(h2)
-  println(s"dIndex(h2):  $dIndexH2")
+  println(s"  dIndex(h2):  $dIndexH2")
   assert(dIndexH2 == 0.0)
   val dSphere = points.dSphere()
-  println(s"dSphere(z2):  $dSphere")
+  println(s"  dSphere(z2):  $dSphere")
   assert(dSphere >= 0.0 && dSphere <= 0.00001)
   assert(dBitstring("100", "100") == 0.0)
   assert(dBitstring("110", "100") == 0.25)
@@ -337,7 +339,7 @@ object Locality extends App {
 
   // more unit tests
   {
-    println(s"Triangle unit tests...")
+    println(s"\nMore triangle unit tests...")
     val idx = t2.toIndex(-78.495150, 38.075776)
     println(s"  Index CCRi:  $idx")
     val t = t2.toPoint(idx)
@@ -360,6 +362,8 @@ object Locality extends App {
   //0.715021582	0.239930681	0.741891317
   //0.715148242	0.238397849	0.740885343
 
+
+  println("\nRunning...")
 
   //var ps: PrintStream = System.out
   var ps: PrintStream = new PrintStream(new FileOutputStream("test-distance.csv"))
