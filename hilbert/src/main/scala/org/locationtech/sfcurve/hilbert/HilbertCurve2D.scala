@@ -28,6 +28,8 @@ object HilbertCurve2DProvider {
 }
 
 class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bitsFromCardinality(resolution).toInt) with IdentityRangeConsolidator {
+  require(resolution > 0, "Resolution is negative; this probably means you tried to pass in a Long value that was too large")
+  require(resolution <= (Int.MaxValue >> 1), s"Resolution is too large; must be no more than ${Int.MaxValue >> 1}")
   val bitsPerDimension: Int = Dimensions.bitsFromCardinality(resolution).toInt
   val precision: Long = resolution
   val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))

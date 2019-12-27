@@ -2,17 +2,23 @@ package org.locationtech.sfcurve.benchmarks
 
 import java.io.{FileOutputStream, FileWriter, PrintStream}
 
-import scala.collection.mutable.{Map=>MutableMap}
-
+import scala.collection.mutable.{Map => MutableMap}
 import org.locationtech.sfcurve.hilbert.HilbertCurve2D
 import org.locationtech.sfcurve.zorder.{TriN, Triangle, ZCurve2D}
-import org.locationtech.sfcurve.{Dimensions, SpaceFillingCurve2D}
+import org.locationtech.sfcurve.{Dimensions, IndexRange, RangeComputeHints, SpaceFillingCurve2D}
 
 object Locality extends App {
+  type Curve = {
+    def cardinality: Long;
+    def toIndex(x: Double, y: Double): Long;
+    def toPoint(index: Long): (Double, Double);
+    def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints]): Seq[IndexRange]
+  }
+
   def toBinaryString(index: Long, bits: Int): String =
     index.toBinaryString.reverse.padTo(bits, "0").reverse.mkString("")
 
-  def dBitstring(idxA: String, idxB: String): Double = {
+  def dBitstring(idxA: String, idxB: String, verbose: Boolean = false): Double = {
     val result: Double = idxA.zip(idxB).zipWithIndex.map {
       case ((bitA, bitB), pos) if bitA != bitB =>
         //println(s"  bits mismatch:  $bitA, $bitB")
@@ -22,7 +28,9 @@ object Locality extends App {
         0.0
     }.sum
 
-    //println(s"dBitString($idxA, $idxB) = $result")
+    if (verbose) {
+      println(s"dBitString($idxA, $idxB) = $result")
+    }
 
     result
   }
@@ -35,42 +43,50 @@ object Locality extends App {
     def wkt: String = "POINT(" + x.degrees + " " + y.degrees + ")"
   }
 
-  case class Points(a: Point, b: Point) {
+  case class Points(a: Point, b: Point, verbose: Boolean = false) {
     val maxDPlane = Math.sqrt(360.0*360.0 + 180.0*180.0)
-    def dPlane: Double = {
+    def dPlane(verbose: Boolean = false): Double = {
       val dx = a.x.degrees - b.x.degrees
       val dy = a.y.degrees - b.y.degrees
-      Math.sqrt(dx * dx + dy * dy) / maxDPlane
+      val result = Math.sqrt(dx * dx + dy * dy) / maxDPlane
+      if (verbose) {
+        println(s"dPlane:  ${a.wkt} to ${b.wkt} = $result")
+      }
+      result
     }
 
-    def dSphere: Double = {
+    def dSphere(verbose: Boolean = false): Double = {
       val x0 = a.x.radians
       val y0 = a.y.radians
       val x1 = b.x.radians
       val y1 = b.y.radians
-      Math.acos(Math.sin(y0) * Math.sin(y1) + Math.cos(y0) * Math.cos(y1) * Math.cos(Math.abs(x1 - x0))) / Math.PI
+      val result = Math.acos(Math.sin(y0) * Math.sin(y1) + Math.cos(y0) * Math.cos(y1) * Math.cos(Math.abs(x1 - x0))) / Math.PI
+      if (verbose) {
+        println(s"dSphere:  ${a.wkt} to ${b.wkt} = $result")
+      }
+      result
     }
 
     implicit def deg2dec(d: Degrees): Double = d.degrees
 
     implicit def dec2deg(d: Double): Degrees = Degrees(d)
 
-    def dIndex(curve: SpaceFillingCurve2D): Double = {
+    def dIndex(curve: SpaceFillingCurve2D, verbose: Boolean = false): Double = {
       val bitsPrecision: Int = Dimensions.bitsFromCardinality(curve.cardinality).toInt
       val idxA: String = toBinaryString(curve.toIndex(a.x, a.y), bitsPrecision)
       val idxB: String = toBinaryString(curve.toIndex(b.x, b.y), bitsPrecision)
-      dBitstring(idxA, idxB)
+      dBitstring(idxA, idxB, verbose = verbose)
     }
 
-    def dTriangle(depth: Int): Double = {
+    def dTriangle(depth: Int, verbose: Boolean = false): Double = {
       val t0 = TriN.getTriangle(a.x.degrees, a.y.degrees, depth)
       val t1 = TriN.getTriangle(b.x.degrees, b.y.degrees, depth)
-      dBitstring(t0.bitString, t1.bitString)
+      dBitstring(t0.bitString, t1.bitString, verbose = verbose)
     }
   }
 
   // utility class for testing, reporting locality
-  case class Distances(name: String, curve: Any) {
+  case class Distances(name: String, curve: {def toIndex(x: Double, y: Double): Long; def toPoint(i: Long): (Double, Double)}) {
     val series: Seq[String] = Seq("plane", "sphere", "index")
     val data: Map[String, MutableMap[String, Int]] = series.map(s => s -> MutableMap.empty[String, Int]).toMap
 
@@ -81,12 +97,21 @@ object Locality extends App {
       submap.put(dist, submap.getOrElse(dist, 0) + 1)
     }
 
-    def accumulate(points: Points): Unit = {
-      acc("plane", points.dPlane)
-      acc("sphere", points.dSphere)
+    def cellPoints(points: Points): Points = {
+      val ai2: Long = curve.toIndex(points.a.x.degrees, points.a.y.degrees)
+      val a2: Point = Point(Degrees(curve.toPoint(ai2)._1), Degrees(curve.toPoint(ai2)._2))
+      val bi2: Long = curve.toIndex(points.b.x.degrees, points.b.y.degrees)
+      val b2: Point = Point(Degrees(curve.toPoint(bi2)._1), Degrees(curve.toPoint(bi2)._2))
+      Points(a2, b2)
+    }
+
+    def accumulate(rawPoints: Points, verbose: Boolean = false): Unit = {
+      val points: Points = cellPoints(rawPoints)
+      acc("plane", points.dPlane(verbose = verbose))
+      acc("sphere", points.dSphere(verbose = verbose))
       val indexDistance = curve match {
-        case sfc: SpaceFillingCurve2D => points.dIndex(sfc)
-        case tri: Triangle => points.dTriangle(tri.depth)
+        case sfc: SpaceFillingCurve2D => points.dIndex(sfc, verbose = verbose)
+        case tri: Triangle => points.dTriangle(tri.depth, verbose = verbose)
       }
       acc("index", indexDistance)
     }
@@ -116,9 +141,13 @@ object Locality extends App {
 
   def generatePoints: Points = Points(generatePoint, generatePoint)
 
-  case class CellIterator(name: String, curve: {def cardinality: Long}) {
+  trait Sampler extends Iterator[Points] {
+    def name: String
+    def curve: Curve
+  }
+
+  case class CellIterator(name: String, curve: Curve) extends Sampler {
     val cardinality: Long = curve.cardinality
-    val distances: Distances = Distances(name, curve)
 
     var lastState: Any = _
     var state: Any = _
@@ -164,17 +193,35 @@ object Locality extends App {
       }
       result
     }
+  }
+
+  case class FixedSample(name: String, curve: Curve, input: Seq[Points]) extends Sampler {
+    val itr: Iterator[Points] = input.iterator
+    def hasNext: Boolean = itr.hasNext
+    def next(): Points = itr.next()
+  }
+
+  case class RandomSample(name: String, curve: Curve, numPoints: Long) extends Sampler {
+    var counter: Long = 0
+    def hasNext: Boolean = counter < numPoints
+    def next(): Points = { counter = counter + 1; generatePoints }
+  }
+
+  case class Summary(sampler: Sampler, verbose: Boolean = false) {
+    val distances: Distances = Distances(sampler.name, sampler.curve)
 
     def exhaust(ps: PrintStream): Unit = {
-      while (hasNext) {
-        distances.accumulate(next())
+      while (sampler.hasNext) {
+        distances.accumulate(sampler.next(), verbose = verbose)
       }
       distances.summarize(ps)
     }
   }
 
   // set up
-  val bitsPrecision: Long = 24
+  val bitsPrecision: Long = 54
+  require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
+  require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
   val cardPerDim = 1L << (bitsPrecision >> 1L)
   println(s"Bits precision $bitsPrecision, cardinality $cardinality")
@@ -196,7 +243,7 @@ object Locality extends App {
   val dIndexH2 = points.dIndex(h2)
   println(s"dIndex(h2):  $dIndexH2")
   assert(dIndexH2 == 0.0)
-  val dSphere = points.dSphere
+  val dSphere = points.dSphere()
   println(s"dSphere(z2):  $dSphere")
   assert(dSphere >= 0.0 && dSphere <= 0.00001)
   assert(dBitstring("100", "100") == 0.0)
@@ -223,10 +270,39 @@ object Locality extends App {
 
 
   var ps: PrintStream = null
+
+  val exhaustive = Seq[Sampler](
+    CellIterator("Z2", z2),
+    CellIterator("H2", h2),
+    CellIterator("T2", t2)
+  )
+
+  val numRandomPoints: Long = 10000
+  val random = Seq[Sampler](
+    RandomSample("Z2", z2, numRandomPoints),
+    RandomSample("H2", h2, numRandomPoints),
+    RandomSample("T2", t2, numRandomPoints)
+  )
+
+  val CharlottesvillePoints = Seq[Points](
+    Points(
+      Point(Degrees(-78.495150), Degrees(38.075776)),  // CCRi
+      Point(Degrees(-78.688256), Degrees(38.054444))  // Eichelberger
+    )
+  )
+  val cville = Seq[Sampler](
+    FixedSample("Z2", z2, CharlottesvillePoints),
+    FixedSample("H2", h2, CharlottesvillePoints),
+    FixedSample("T2", t2, CharlottesvillePoints)
+  )
+
+  val samples: Seq[Sampler] = cville
+
+  for (sample <- samples) {
+    Summary(sample, verbose = true).exhaust(ps)
+  }
+
 //  try {
-    //CellIterator("Z2", z2).exhaust(ps)
-    //CellIterator("H2", h2).exhaust(ps)
-    CellIterator("triangle", TriN.createLowestIndex(TriangleDepth)).exhaust(ps)
 //  } catch { case t: Throwable =>
 //    ps.close()
 //  }

@@ -3,6 +3,7 @@ package org.locationtech.sfcurve.zorder
 import java.io.{FileWriter, PrintWriter}
 
 import org.locationtech.sfcurve.Dimensions.{Cell, Extent, Latitude, Longitude}
+import org.locationtech.sfcurve.{InMemoryRangeConsolidator, IndexRange, RangeComputeHints, SpaceFillingCurve2D}
 import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 /**
@@ -29,7 +30,7 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 import TriN._
 
-case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[Double], depth: Int) {
+case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[Double], depth: Int) extends SpaceFillingCurve2D(depth * 3) with InMemoryRangeConsolidator {
   val x0: Double = X.min
   val x1: Double = X.max
   val xMid: Double = 0.5 * (x0 + x1)
@@ -42,9 +43,43 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
   val yMid: Double = 0.5 * (y0 + y1)
 
-  val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
+  override val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
 
   def bitString: String = indexBinaryString(index, depth)
+
+  // degenerate for the Curve contract
+  override def toIndex(x: Double, y: Double): Long = {
+    TriN.index(x, y, depth)
+  }
+
+  // degenerate for the Curve contract
+  override def toPoint(index: Long): (Double, Double) = {
+    val t = TriN.invIndex(index, depth)
+    (t.xMid, t.yMid)
+  }
+
+  // degenerate for the Curve contract
+  override def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    // TODO make this not be brute force and ignorance!
+    var tOpt: Option[Triangle] = Option(TriN.createLowestIndex(depth))
+    var result: collection.mutable.ArrayBuffer[IndexRange] = new collection.mutable.ArrayBuffer
+    while (tOpt.isDefined) {
+      if (TriN.overlaps(tOpt.get, xmin, xmax, ymin, ymax)) {
+        //TODO figure out a better solution for "contained = true"
+        result.append(IndexRange(tOpt.get.index, tOpt.get.index, contained = true))
+      }
+      tOpt = tOpt.get.next
+    }
+    result.toSeq
+
+    // do the in-memory ordering and consolidation of these index ranges
+    consolidateRanges(result.iterator).toSeq
+  }
+
+  def fold(subordinates: Seq[Long]): Long = throw new Exception("DO NOT CALL Triangle.fold")
+  def unfold(index: Long): Vector[Long] = throw new Exception("DO NOT CALL Triangle.unfold")
+  def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] =
+    throw new Exception("DO NOT CALL Triangle.indexRanges")
 
   def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 7)
 
@@ -380,6 +415,16 @@ object TriN {
     invIndex(List.fill(depth)(TriN.TransCenter).foldLeft(0L)((acc, t) => (acc << 3L) | t), depth)
   }
 
+  def overlaps(triangle: Triangle, xmin: Double, xmax: Double, ymin: Double, ymax: Double): Boolean = {
+    // easy exclusions
+    if (triangle.x1 < xmin) return false
+    if (triangle.x0 > xmax) return false
+    if (triangle.y1 < ymin) return false
+    if (triangle.y0 > ymax) return false
+    // TODO make this more refined; it's not necessary that they overlap at this point, because of the angles
+    true
+  }
+
   // map the given (x, y) coordinate to one face of the octahedron
   // that wraps the entire (spherical) Earth
   def getInitialTriangle(x: Double, y: Double): Triangle = {
@@ -477,6 +522,7 @@ object NamedLocations {
   case class LatLon(latitude: Double, longitude: Double)
   val LocationsByName: Map[String, LatLon] = Map(
     "Charlottesville" -> LatLon(38.0293, -78.4767),
+    "CCRi" -> LatLon(38.075776, -78.495150),
     "Eichelberger" -> LatLon(38.054444, -78.688256),
     "Kunkel" -> LatLon(38.053707, -78.688751),
     "Price" -> LatLon(38.053373, -78.684150),

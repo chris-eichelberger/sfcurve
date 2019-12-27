@@ -87,8 +87,8 @@ object IndexRange {
   */
 abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve {
   // we assume that the cardinality is specified in terms of the number of bits precision
-  val xDimension: Longitude = Longitude(1L << bitsPrecision)
-  val yDimension: Latitude = Latitude(1L << bitsPrecision)
+  val xDimension: Longitude = Longitude(1L << bitsPrecision.toLong)
+  val yDimension: Latitude = Latitude(1L << bitsPrecision.toLong)
   val children: Vector[Discretizor] = Vector(xDimension, yDimension)
 
   @deprecated("use 'index' instead", "SFCurve 2.0")
