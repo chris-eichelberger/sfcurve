@@ -42,6 +42,8 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
   val yMid: Double = 0.5 * (y0 + y1)
 
+  val cardinality: Long = (depth - 1) << 5L
+
   def bitString: String = indexBinaryString(index, depth)
 
   def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 7)
@@ -371,6 +373,10 @@ object TriN {
       case (1, 0) => A_BC
       case (1, 1) => A_CB
     }
+  }
+
+  def createLowestIndex(depth: Int): Triangle = {
+    invIndex(List.fill(depth)(TriN.TransCenter).foldLeft(0L)((acc, t) => (acc << 3L) | t), depth)
   }
 
   // map the given (x, y) coordinate to one face of the octahedron

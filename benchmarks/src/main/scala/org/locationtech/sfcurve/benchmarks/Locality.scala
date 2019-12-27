@@ -36,10 +36,11 @@ object Locality extends App {
   }
 
   case class Points(a: Point, b: Point) {
-    def dFlat: Double = {
+    val maxDPlane = Math.sqrt(360.0*360.0 + 180.0*180.0)
+    def dPlane: Double = {
       val dx = a.x.degrees - b.x.degrees
       val dy = a.y.degrees - b.y.degrees
-      Math.sqrt(dx * dx + dy * dy)
+      Math.sqrt(dx * dx + dy * dy) / maxDPlane
     }
 
     def dSphere: Double = {
@@ -61,9 +62,9 @@ object Locality extends App {
       dBitstring(idxA, idxB)
     }
 
-    def dTriangle(bits: Int): Double = {
-      val t0 = TriN.getTriangle(a.x.degrees, a.y.degrees, bits)
-      val t1 = TriN.getTriangle(b.x.degrees, b.y.degrees, bits)
+    def dTriangle(depth: Int): Double = {
+      val t0 = TriN.getTriangle(a.x.degrees, a.y.degrees, depth)
+      val t1 = TriN.getTriangle(b.x.degrees, b.y.degrees, depth)
       dBitstring(t0.bitString, t1.bitString)
     }
   }
@@ -81,11 +82,11 @@ object Locality extends App {
     }
 
     def accumulate(points: Points): Unit = {
-      acc("plane", points.dFlat)
+      acc("plane", points.dPlane)
       acc("sphere", points.dSphere)
       val indexDistance = curve match {
         case sfc: SpaceFillingCurve2D => points.dIndex(sfc)
-        case tri: Triangle => points.dTriangle(tri.depth * 3)
+        case tri: Triangle => points.dTriangle(tri.depth)
       }
       acc("index", indexDistance)
     }
@@ -114,6 +115,62 @@ object Locality extends App {
   def generatePoint: Point = Point(generateLongitude, generateLatitude)
 
   def generatePoints: Points = Points(generatePoint, generatePoint)
+
+  case class CellIterator(name: String, curve: {def cardinality: Long}) {
+    val cardinality: Long = curve.cardinality
+    val distances: Distances = Distances(name, curve)
+
+    var lastState: Any = _
+    var state: Any = _
+    var counter: Int = 0
+
+    state = curve match {
+      case sfc: SpaceFillingCurve2D => 0
+      case tri: Triangle => tri
+    }
+    var lastPoint: Point = getPoint
+    counter = 1
+    lastState = state
+    state = curve match {
+      case sfc: SpaceFillingCurve2D => 1
+      case tri: Triangle => tri.next.orNull
+    }
+    var point: Point = getPoint
+
+    private def getPoint: Point = curve match {
+      case sfc: SpaceFillingCurve2D =>
+        val p = sfc.toPoint(counter)
+        Point(Degrees(p._1), Degrees(p._2))
+      case tri: Triangle =>
+        val result = Point(Degrees(state.asInstanceOf[Triangle].xMid), Degrees(state.asInstanceOf[Triangle].yMid))
+        result
+    }
+
+    def hasNext: Boolean = counter < cardinality
+
+    def next(): Points = {
+      val result = Points(lastPoint, point)
+      //println(s"next:  result = $result")
+      lastPoint = point
+      lastState = state
+      counter = counter + 1
+      if (hasNext) {
+        state = curve match {
+          case sfc: SpaceFillingCurve2D => counter
+          case tri: Triangle => state.asInstanceOf[Triangle].next.orNull
+        }
+        point = getPoint
+      }
+      result
+    }
+
+    def exhaust(ps: PrintStream): Unit = {
+      while (hasNext) {
+        distances.accumulate(next())
+      }
+      distances.summarize(ps)
+    }
+  }
 
   // set up
   val bitsPrecision: Long = 6
@@ -157,92 +214,14 @@ object Locality extends App {
 
 
   var ps: PrintStream = null
-//  try {
-    /*
-    ps = new PrintStream(new FileOutputStream("test-distance.csv"))
-    val curves = Seq(z2, h2)
-    //val ps: PrintStream = System.out
-    ps.println("point_a_wkt,point_b_wkt,dist_sphere,dist_z2,dist_h2,dist_tri")
-    for (i <- 1 to 100000) {
-      val points = generatePoints
-      ps.print(s"""\"${points.a.wkt}\",\"${points.b.wkt}\"""")
-      ps.print(s",${points.dSphere}")
-      for (sfc <- curves) {
-        //ps.print(s"\nindex A:  ${toBinaryString(sfc.toIndex(points.a.x.degrees, points.a.y.degrees), bitsPrecision.toInt)}")
-        //ps.print(s"\nindex B:  ${toBinaryString(sfc.toIndex(points.b.x.degrees, points.b.y.degrees), bitsPrecision.toInt)}")
-        ps.print(s",${points.dIndex(sfc)}")
-      }
-      ps.print(s",${points.dTriangle(bitsPrecision.toInt / 3)}")
-      ps.println()
-    }
-    */
+  try {
+    val TriangleDepth = bitsPrecision.toInt / 3
 
-//    var z2Idx = 0L
-//    val z2Dists = collection.mutable.Map.empty[String, Int]
-//    while (z2Idx < z2.cardinality) {
-//      if (z2Idx > 0) {
-//        val xy0 = z2.toPoint(z2Idx - 1)
-//        val a = Point(Degrees(xy0._1), Degrees(xy0._2))
-//        val xy1 = z2.toPoint(z2Idx)
-//        val b = Point(Degrees(xy1._1), Degrees(xy1._2))
-//        val points = Points(a, b)
-//        val dist = f"${points.dSphere}%1.5f"
-//        z2Dists.put(dist, z2Dists.getOrElse(dist, 0) + 1)
-//      }
-//      z2Idx = z2Idx + 1
-//    }
-//    {
-//      println("\nZ2 distances...")
-//      println(s"  Total inter-Z2 distances:  ${z2Dists.values.sum}")
-//      val totalDist = z2Dists.map {
-//        case (k, v) => k.toDouble * v
-//      }.sum
-//      println(s"  Mean inter-Z2 distance:  ${totalDist / z2Dists.values.sum}")
-//    }
-//
-//    var h2Idx = 0L
-//    val h2Dists = collection.mutable.Map.empty[String, Int]
-//    while (h2Idx < h2.cardinality) {
-//      if (h2Idx > 0) {
-//        val xy0 = h2.toPoint(z2Idx - 1)
-//        val a = Point(Degrees(xy0._1), Degrees(xy0._2))
-//        val xy1 = h2.toPoint(z2Idx)
-//        val b = Point(Degrees(xy1._1), Degrees(xy1._2))
-//        val points = Points(a, b)
-//        val dist = f"${points.dSphere}%1.5f"
-//        h2Dists.put(dist, h2Dists.getOrElse(dist, 0) + 1)
-//      }
-//      h2Idx = h2Idx + 1
-//    }
-//    {
-//      println("\nH2 distances...")
-//      println(s"  Total inter-H2 distances:  ${h2Dists.values.sum}")
-//      val totalDist = h2Dists.map {
-//        case (k, v) => k.toDouble * v
-//      }.sum
-//      println(s"  Mean inter-H2 distance:  ${totalDist / h2Dists.values.sum}")
-//    }
-
-    val depth: Int = bitsPrecision.toInt / 3
-    val triCardinality = 8 * (depth - 1) * 4
-    var triOpt: Option[Triangle] = Option(TriN.invIndex(List.fill(depth)(TriN.TransCenter).foldLeft(0L)((acc, t) => (acc << 3L) | t), depth))
-    var lastTriOpt: Option[Triangle] = None
-    val triDists = Distances("triangle", triOpt.get)
-    while (triOpt.isDefined) {
-      //println(s"Iterating over triangle ${triOpt.get.bitString}, $triOpt")
-      lastTriOpt.foreach(lastTri => {
-        val point0 = Point(Degrees(lastTri.xMid), Degrees(lastTri.yMid))
-        val point1 = Point(Degrees(triOpt.get.xMid), Degrees(triOpt.get.yMid))
-        val points = Points(point0, point1)
-        triDists.accumulate(points)
-      })
-      lastTriOpt = triOpt
-      triOpt = triOpt.get.next
-    }
-    triDists.summarize(ps)
-
-//  } catch { case t: Throwable =>
-//    ps.close()
-//  }
+    CellIterator("Z2", z2).exhaust(ps)
+    CellIterator("H2", h2).exhaust(ps)
+    CellIterator("triangle", TriN.createLowestIndex(TriangleDepth)).exhaust(ps)
+  } catch { case t: Throwable =>
+    ps.close()
+  }
 
 }
