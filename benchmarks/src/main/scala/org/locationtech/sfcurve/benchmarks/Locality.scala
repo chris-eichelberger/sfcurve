@@ -256,10 +256,10 @@ object Locality extends App {
     val columns = Seq("plane", "sphere", "index")
     val allcols: Seq[String] = CartesianProductIterable(Seq(columns, curves.map(_.name))).iterator.toSeq.map(_.mkString("_"))
     def exhaust(ps: PrintStream): Unit = {
-      ps.println("from_wkt,to_wkt," + allcols.mkString(","))
+      ps.println("from_wkt,to_wkt,plane,sphere," + allcols.mkString(","))
       while (sampler.hasNext) {
         val sample = sampler.next()
-        ps.print(s"${sample.a.wkt},${sample.b.wkt}")
+        ps.print(s"${sample.a.wkt},${sample.b.wkt},${sample.dPlane()},${sample.dSphere()}")
         distances.foreach {
           case (_, dists) =>
             ps.print("," + dists.csvLine(sample, verbose = verbose))
