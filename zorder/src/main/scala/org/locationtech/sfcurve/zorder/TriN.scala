@@ -47,15 +47,21 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   def bitString: String = indexBinaryString(index, depth)
 
+  def xtInverse: Double = {
+    val result = TriN.getXTInv(xMid, yMid, X)
+    println(s"xtInverse($xMid, $yMid, $X) -> $result")
+    result
+  }
+
   // degenerate for the Curve contract
   override def toIndex(x: Double, y: Double): Long = {
-    TriN.index(x, y, depth)
+    TriN.index(xtInverse, y, depth)
   }
 
   // degenerate for the Curve contract
   override def toPoint(index: Long): (Double, Double) = {
     val t = TriN.invIndex(index, depth)
-    (t.xMid, t.yMid)
+    (t.xtInverse, t.yMid)
   }
 
   // degenerate for the Curve contract

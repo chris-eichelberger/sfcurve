@@ -97,11 +97,16 @@ object Locality extends App {
       submap.put(dist, submap.getOrElse(dist, 0) + 1)
     }
 
+    def curvePointFromIndex(index: Long): Point = {
+      val (x: Double, y: Double) = curve.toPoint(index)
+      Point(Degrees(x), Degrees(y))
+    }
+
     def cellPoints(points: Points): Points = {
       val ai2: Long = curve.toIndex(points.a.x.degrees, points.a.y.degrees)
-      val a2: Point = Point(Degrees(curve.toPoint(ai2)._1), Degrees(curve.toPoint(ai2)._2))
+      val a2: Point = curvePointFromIndex(ai2)
       val bi2: Long = curve.toIndex(points.b.x.degrees, points.b.y.degrees)
-      val b2: Point = Point(Degrees(curve.toPoint(bi2)._1), Degrees(curve.toPoint(bi2)._2))
+      val b2: Point = curvePointFromIndex(bi2)
       Points(a2, b2)
     }
 
@@ -172,8 +177,8 @@ object Locality extends App {
         Point(Degrees(p._1), Degrees(p._2))
       case tri: Triangle =>
         require(state != null, s"'state' was <NULL> unexpectedly for counter $counter (< cardinality $cardinality)")
-        val result = Point(Degrees(state.asInstanceOf[Triangle].xMid), Degrees(state.asInstanceOf[Triangle].yMid))
-        result
+        val p = tri.toPoint(tri.index)
+        Point(Degrees(p._1), Degrees(p._2))
     }
 
     def hasNext: Boolean = counter < cardinality
