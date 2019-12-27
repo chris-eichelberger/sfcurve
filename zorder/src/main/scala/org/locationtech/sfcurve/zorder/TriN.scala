@@ -43,17 +43,38 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   }
   val yMid: Double = 0.5 * (y0 + y1)
 
+  lazy val octahedronFace: Triangle = TriN.getInitialTriangle(xMid, yMid)
+  lazy val octahedronXRange: Extent[Double] = octahedronFace.X
+  lazy val xt0: Double = TriN.getXTInv(Math.min(x0, x1), Math.min(Math.abs(y0), Math.abs(y1)), octahedronXRange)
+  lazy val xt1: Double = TriN.getXTInv(Math.max(x0, x1), Math.min(Math.abs(y0), Math.abs(y1)), octahedronXRange)
+
   override val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
 
   val name: String = "Triangle"
 
   def bitString: String = indexBinaryString(index, depth)
 
+
   def xtInverse: Double = {
-    val t0 = TriN.getInitialTriangle(xMid, yMid)
-    val result = TriN.getXTInv(xMid, yMid, t0.X)
+    val result = TriN.getXTInv(xMid, yMid, octahedronXRange)
     //println(s"xtInverse($xMid, $yMid, $X) -> $result")
     result
+  }
+
+  def contains(x: Double, y: Double): Boolean = {
+    if (x < Math.min(x0, x1)) return false
+    if (x > Math.max(x0, x1)) return false
+    if (y < Math.min(y0, y1)) return false
+    if (y > Math.max(y0, y1)) return false
+    true
+  }
+
+  def overlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
+    if (xt0 > xmax) return false
+    if (xt1 < xmin) return false
+    if (Math.min(y0, y1) > ymax) return false
+    if (Math.max(y0, y1) < ymin) return false
+    true
   }
 
   // degenerate for the Curve contract
@@ -69,15 +90,20 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   // degenerate for the Curve contract
   override def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    require(xmin <= xmax)
+    require(ymin <= ymax)
     // TODO make this not be brute force and ignorance!
     var tOpt: Option[Triangle] = Option(TriN.createLowestIndex(depth))
     var result: collection.mutable.ArrayBuffer[IndexRange] = new collection.mutable.ArrayBuffer
     while (tOpt.isDefined) {
-      if (TriN.overlaps(tOpt.get, xmin, xmax, ymin, ymax)) {
+      if (tOpt.get.overlaps(xmin, ymin, xmax, ymax)) {
         //TODO figure out a better solution for "contained = true"
         result.append(IndexRange(tOpt.get.index, tOpt.get.index, contained = true))
       }
       tOpt = tOpt.get.next
+    }
+    if (result.size < 1) {
+      throw new Error(s"Failed to find Triangle range:  X($xmin, $xmax), Y($ymin, $ymax)!")
     }
     result.toSeq
 
@@ -450,12 +476,22 @@ object TriN {
     Triangle(idx, orientation, Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
   }
 
+  def getXT(x: Double, y: Double): Double = {
+    val t0: Triangle = getInitialTriangle(x, y)
+    getXT(x, y, t0.X)
+  }
+
   def getXT(x: Double, y: Double, X: Extent[Double]): Double = {
     val dx = X.max - X.min
     val pY = (90.0 - Math.abs(y)) / 90.0
     val xMid = X.min + 0.5 * dx
     val xT = xMid - pY * (xMid - x)
     xT
+  }
+
+  def getXTInv(x: Double, y: Double): Double = {
+    val t0: Triangle = getInitialTriangle(x, y)
+    getXTInv(x, y, t0.X)
   }
 
   def getXTInv(xT: Double, y: Double, X: Extent[Double]): Double = {
