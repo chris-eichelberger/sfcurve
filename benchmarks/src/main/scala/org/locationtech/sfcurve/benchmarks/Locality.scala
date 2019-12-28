@@ -279,6 +279,7 @@ object Locality extends App {
     val numRanges = ranges.size
     val numCells = ranges.map(_.size).sum
     assert(numRanges > 0, s"Curve ${curve.name} cardinality ${curve.cardinality} has an empty range over X($x0, $x1) Y($y0, $y1)!")
+    //if (numRanges <= 0) println(s"[WARNING] Curve ${curve.name} cardinality ${curve.cardinality} has an empty range over X($x0, $x1) Y($y0, $y1)!")
     s"$numRanges,$numCells"
   }
 
@@ -289,6 +290,7 @@ object Locality extends App {
       ps.println("from_wkt,to_wkt,plane,sphere," + allcols.mkString(","))
       while (sampler.hasNext) {
         val sample = sampler.next()
+        println(s"  Processing sample ${sample.a.wkt}, ${sample.b.wkt}...")
         ps.print(s"${sample.a.wkt},${sample.b.wkt},${sample.dPlane()},${sample.dSphere()}")
         distances.foreach {
           case (curve, dists) =>
@@ -302,9 +304,9 @@ object Locality extends App {
 
   // set up
   println("Setting up...")
-  val bitsPrecision: Long = 24
-  require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
-  require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
+  val bitsPrecision: Long = 33
+//  require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
+//  require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
   val cardPerDim = 1L << (bitsPrecision >> 1L)
   println(s"  Bits precision $bitsPrecision, cardinality $cardinality")
@@ -378,7 +380,7 @@ object Locality extends App {
   val numRandomPoints: Long = 10
   val random = Seq(RandomSample(numRandomPoints))
 
-  val numRandomQueries: Long = 10000
+  val numRandomQueries: Long = 7000
   val querySizeDegrees: Double = 1.0
   val queries = Seq(QuerySampler(numRandomQueries, querySizeDegrees))
 
@@ -393,7 +395,8 @@ object Locality extends App {
   val samplers: Seq[Sampler] = queries
 
   for (sampler <- samplers) {
-    Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
+    //Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
+    Table(sampler, verbose = false, t2).exhaust(ps)
   }
 
   ps.close()

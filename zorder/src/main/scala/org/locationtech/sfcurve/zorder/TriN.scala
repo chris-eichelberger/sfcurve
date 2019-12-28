@@ -88,10 +88,32 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     (t.xtInverse, t.yMid)
   }
 
+  def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
+
+  // called by TriN and itself
+  def getRangesRecursively(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
+    // check stop conditions
+    if (depth > maxDepth) return Seq[IndexRange]()
+
+    // find your children that intersect the query area
+    val subs = childTriangles.filter(_.overlaps(xmin, ymin, xmax, ymax))
+    if (subs.isEmpty) return Seq[IndexRange]()
+
+    // recurse, and combine the results
+    subs.tail.foldLeft(subs.head.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth))((acc, t) => {
+      t.consolidateRanges((acc ++ t.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth)).iterator).toSeq
+    })
+  }
+
   // degenerate for the Curve contract
   override def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
     require(xmin <= xmax)
     require(ymin <= ymax)
+
+    // defer to the companion object to do this planning top-down
+    TriN.getRanges(xmin, ymin, xmax, ymax, depth)
+
+/*
     // TODO make this not be brute force and ignorance!
     var tOpt: Option[Triangle] = Option(TriN.createLowestIndex(depth))
     var result: collection.mutable.ArrayBuffer[IndexRange] = new collection.mutable.ArrayBuffer
@@ -109,6 +131,7 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
     // do the in-memory ordering and consolidation of these index ranges
     consolidateRanges(result.iterator).toSeq
+*/
   }
 
   def fold(subordinates: Seq[Long]): Long = throw new Exception("DO NOT CALL Triangle.fold")
@@ -448,6 +471,20 @@ object TriN {
 
   def createLowestIndex(depth: Int): Triangle = {
     invIndex(List.fill(depth)(TriN.TransCenter).foldLeft(0L)((acc, t) => (acc << 3L) | t), depth)
+  }
+
+  val OctahedronFaces: Vector[Triangle] = (0 to 7).map(face => invIndex(face, 1)).toVector
+
+  def getRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
+    // find the top-level octahedron faces that intersect the query region at all
+    val faces: Vector[Triangle] = OctahedronFaces.filter(t => t.overlaps(xmin, ymin, xmax, ymax))
+    if (faces.isEmpty) throw new Exception("Triangle query did not match any octahedral faces!")
+
+    // recurse, and combine results
+    faces.tail.foldLeft(faces.head.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth))((acc, face) => {
+      val faceRanges: Seq[IndexRange] = face.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth)
+      face.consolidateRanges((acc ++ faceRanges).iterator).toSeq
+    })
   }
 
   def overlaps(triangle: Triangle, xmin: Double, xmax: Double, ymin: Double, ymax: Double): Boolean = {
