@@ -270,19 +270,20 @@ object Locality extends App {
     }
   }
 
-  def numQueryRanges(curve: Curve, query: Points): Long = {
+  def numQueryRanges(curve: Curve, query: Points): String = {
     val x0: Double = Math.min(query.a.x.degrees, query.b.x.degrees)
     val y0: Double = Math.min(query.a.y.degrees, query.b.y.degrees)
     val x1: Double = Math.max(query.a.x.degrees, query.b.x.degrees)
     val y1: Double = Math.max(query.a.y.degrees, query.b.y.degrees)
     val ranges = curve.toRanges(x0, y0, x1, y1, None)
-    val result = ranges.size
-    assert(result > 0, s"Curve ${curve.name} cardinality ${curve.cardinality} has an empty range over X($x0, $x1) Y($y0, $y1)!")
-    result
+    val numRanges = ranges.size
+    val numCells = ranges.map(_.size).sum
+    assert(numRanges > 0, s"Curve ${curve.name} cardinality ${curve.cardinality} has an empty range over X($x0, $x1) Y($y0, $y1)!")
+    s"$numRanges,$numCells"
   }
 
   case class Table(sampler: Sampler, verbose: Boolean, curves: Curve*) extends Aggregator(sampler, verbose, curves:_*) {
-    val columns = Seq("plane", "sphere", "index", "nqr")
+    val columns = Seq("plane", "sphere", "index", "nqr", "nqc")
     val allcols: Seq[String] = CartesianProductIterable(Seq(columns, curves.map(_.name))).iterator.toSeq.map(_.mkString("_"))
     def exhaust(ps: PrintStream): Unit = {
       ps.println("from_wkt,to_wkt,plane,sphere," + allcols.mkString(","))
@@ -301,7 +302,7 @@ object Locality extends App {
 
   // set up
   println("Setting up...")
-  val bitsPrecision: Long = 18
+  val bitsPrecision: Long = 24
   require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   val cardinality = 1L << bitsPrecision
@@ -374,7 +375,7 @@ object Locality extends App {
     CellIterator("T2", t2)
   )
 
-  val numRandomPoints: Long = 100
+  val numRandomPoints: Long = 10000
   val random = Seq(RandomSample(numRandomPoints))
 
   val numRandomQueries: Long = 10

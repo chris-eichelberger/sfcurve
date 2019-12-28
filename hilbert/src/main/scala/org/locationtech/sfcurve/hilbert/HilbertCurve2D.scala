@@ -31,7 +31,7 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
   require(resolution > 0, "Resolution is negative; this probably means you tried to pass in a Long value that was too large")
   require(resolution <= (Int.MaxValue >> 1), s"Resolution is too large; must be no more than ${Int.MaxValue >> 1}")
   val bitsPerDimension: Int = Dimensions.bitsFromCardinality(resolution).toInt
-  val precision: Long = resolution
+  val precision: Long = Dimensions.bitsFromCardinality(resolution)
   val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))
 
   val name: String = "Hilbert"
@@ -105,7 +105,7 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
       throw new Exception(s"Single-cell strip should not be possible:  long ($minNormalizedLongitude, $maxNormalizedLongitude), lat ($minNormalizedLatitude, $maxNormalizedLatitude)")
     }
 
-    val chc = new CompactHilbertCurve(Array[Int](resolution, resolution))
+    val chc = new CompactHilbertCurve(Array[Int](precision.toInt, precision.toInt))
     val region = new java.util.ArrayList[LongRange]()
 
     region.add(LongRange.of(minNormalizedLongitude,maxNormalizedLongitude))
