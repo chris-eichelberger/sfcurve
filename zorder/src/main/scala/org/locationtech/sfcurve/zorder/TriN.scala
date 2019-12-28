@@ -93,7 +93,11 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   // called by TriN and itself
   def getRangesRecursively(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
     // check stop conditions
-    if (depth > maxDepth) return Seq[IndexRange]()
+    if (depth == maxDepth) {
+      // if you've gotten here, then your (single) index is the only thing to return
+      return Seq(IndexRange(index, index, contained = true))
+    }
+    if (depth > maxDepth) throw new Exception("Should not be able to recurse this far")
 
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.overlaps(xmin, ymin, xmax, ymax))
