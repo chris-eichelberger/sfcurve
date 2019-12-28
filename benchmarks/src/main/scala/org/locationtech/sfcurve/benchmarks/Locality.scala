@@ -375,10 +375,10 @@ object Locality extends App {
     CellIterator("T2", t2)
   )
 
-  val numRandomPoints: Long = 10000
+  val numRandomPoints: Long = 10
   val random = Seq(RandomSample(numRandomPoints))
 
-  val numRandomQueries: Long = 10
+  val numRandomQueries: Long = 10000
   val querySizeDegrees: Double = 1.0
   val queries = Seq(QuerySampler(numRandomQueries, querySizeDegrees))
 
