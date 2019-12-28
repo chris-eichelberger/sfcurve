@@ -30,6 +30,21 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 import TriN._
 
+case class Rectangle(x0: Double, y0: Double, x1: Double, y1: Double) {
+  require(x0 <= x1)
+  require(y0 <= y1)
+
+  def overlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
+    require(xmin <= xmax)
+    require(ymin <= ymax)
+    if (xmin > x1) return false
+    if (xmax < x0) return false
+    if (ymin > y1) return false
+    if (ymax < y0) return false
+    true
+  }
+}
+
 case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[Double], depth: Int) extends SpaceFillingCurve2D(depth * 3) with InMemoryRangeConsolidator {
   val x0: Double = X.min
   val x1: Double = X.max
@@ -53,7 +68,6 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   val name: String = "Triangle"
 
   def bitString: String = indexBinaryString(index, depth)
-
 
   def xtInverse: Double = {
     val result = TriN.getXTInv(xMid, yMid, octahedronXRange)
@@ -88,6 +102,10 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     (t.xtInverse, t.yMid)
   }
 
+  def rectangle: Rectangle = {
+
+  }
+
   def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
 
   // called by TriN and itself
@@ -101,7 +119,10 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.overlaps(xmin, ymin, xmax, ymax))
-    if (subs.isEmpty) return Seq[IndexRange]()
+    if (subs.isEmpty) {
+
+      return Seq[IndexRange]()
+    }
 
     // recurse, and combine the results
     subs.tail.foldLeft(subs.head.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth))((acc, t) => {

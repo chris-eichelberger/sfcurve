@@ -392,7 +392,15 @@ object Locality extends App {
   )
   val cville = Seq(FixedSample(CharlottesvillePoints))
 
-  val samplers: Seq[Sampler] = queries
+  val debugQueries = Seq(FixedSample(Seq(
+    Points(
+      //POINT(68.62082281207503 39.77771938277874), POINT(69.62082281207503 40.77771938277874)
+      Point(Degrees(68.62082281207503), Degrees(39.77771938277874)),
+      Point(Degrees(69.62082281207503), Degrees(40.77771938277874))
+    )
+  )))
+
+  val samplers: Seq[Sampler] = debugQueries
 
   for (sampler <- samplers) {
     //Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
