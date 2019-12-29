@@ -929,6 +929,9 @@ object TriTest extends App {
     }
     pw.close()
 
+    // validate the 2D geo/oct coordinate translation
+
+
   } finally {
     pw.close()
   }
