@@ -256,7 +256,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
       case TransCenter =>
         //Extent(octX14, octX34), makeExtent(y0, yMid)
         if (isAllApex) {
-          TriBounds(bounds.geoXBase, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+          TriBounds(bounds.geoXBase.peq2, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
         } else {
           TriBounds(bounds.geoXBase.peq2, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
         }
@@ -265,22 +265,14 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
         if (isAllApex) {
           TriBounds(bounds.geoXApex, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
         } else {
-          TriBounds(bounds.geoXApex, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
+          TriBounds(bounds.geoXApex.peq2, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
         }
       case TransLL =>
         //Extent(octX0, octXMid), makeExtent(y0, yMid)
-        if (isAllApex) {
-          TriBounds(bounds.geoXAtMidY.peq0, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
-        } else {
-          TriBounds(bounds.geoXAtMidY.peq0, bounds.geoXAtMidY.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
-        }
+        TriBounds(bounds.geoXAtMidY.peq0, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
       case TransLR =>
         //Extent(octXMid, octX1), makeExtent(y0, yMid)
-        if (isAllApex) {
-          TriBounds(bounds.geoXAtMidY.peq4, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
-        } else {
-          TriBounds(bounds.geoXAtMidY.peq4, bounds.geoXAtMidY.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
-        }
+        TriBounds(bounds.geoXAtMidY.peq4, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
       case _ =>
         throw new Exception(s"Invalid transition $transition")
     }
@@ -655,6 +647,10 @@ object TriN {
   def indexBinaryString(index: Long, depth: Int): String =
     index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
 
+  def indexOctalString(index: Long, depth: Int): String = {
+    (0 until depth).map(pos => ((index >> (3 * pos)) & 7L).toString).reverse.mkString("")
+  }
+
   // assume you've given a GEOGRAPHIC X-coordinate
   def index(geoX: Double, y: Double, maxDepth: Int): Long = {
     getTriangle(geoX, y, maxDepth).index
@@ -918,7 +914,7 @@ object TriTest extends App {
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
     pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tis_all_apex")
     for (t <- iterator(3)) {
-      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
+      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${indexOctalString(t.index, t.depth)}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
     }
     pw.close()
 
