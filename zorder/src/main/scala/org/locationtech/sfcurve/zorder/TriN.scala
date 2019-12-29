@@ -30,38 +30,125 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 import TriN._
 
-case class Rectangle(x0: Double, y0: Double, x1: Double, y1: Double) {
-  require(x0 <= x1)
-  require(y0 <= y1)
+// although this will often have a degenerate Apex Geo X (when the shape is a proper triangle),
+// it can also describe a real rectangle (as for an octahedron face) as well as a trapezoid
+case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: Extent[Double], Y: Extent[Double]) {
+  val octX0: Double = octX.min
+  val octX1: Double = octX.max
+  val octXMid: Double = octX.q2
+  val octX14: Double = octX.q1
+  val octX34: Double = octX.q3
 
-  def overlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
-    require(xmin <= xmax)
-    require(ymin <= ymax)
-    if (xmin > x1) return false
-    if (xmax < x0) return false
-    if (ymin > y1) return false
-    if (ymax < y0) return false
+  val geoX: Extent[Double] = Extent(Math.min(geoXApex.min, geoXBase.min), Math.max(geoXApex.max, geoXBase.max))
+  val geoX0: Double = geoX.min
+  val geoX1: Double = geoX.max
+  val geoXMid: Double = geoX.q2
+  val geoX14: Double = geoX.q1
+  val geoX34: Double = geoX.q3
+
+  val y0: Double = Y.min
+  val y1: Double = Y.max
+  val yMid: Double = Y.q2
+
+  def geoCenter: (Double, Double) = (geoXMid, yMid)
+
+  def octCenter: (Double, Double) = (octXMid, yMid)
+
+  def childBounds(isParentApexUp: Boolean, transition: Int): TriBounds = {
+    //TODO figure out how to handle apex/base switching at the poles!
+    transition match {
+      case TransCenter =>
+        //Extent(octX14, octX34), makeExtent(y0, yMid)
+        TriBounds(geoXApex.subH1, geoXBase.subH1, octX.subH1, TriN.makeExtent(y0, yMid))
+      case TransApex =>
+        //Extent(octX14, octX34), makeExtent(yMid, y1)
+        TriBounds(geoXApex.subH1, geoXBase.subH1, octX.subH1, TriN.makeExtent(yMid, y1))
+      case TransLL =>
+        //Extent(octX0, octXMid), makeExtent(y0, yMid)
+        TriBounds(geoXApex.subH0, geoXBase.subH0, octX.subH0, TriN.makeExtent(y0, yMid))
+      case TransLR =>
+        //Extent(octXMid, octX1), makeExtent(y0, yMid)
+        TriBounds(geoXApex.subH2, geoXBase.subH2, octX.subH2, TriN.makeExtent(y0, yMid))
+      case _ =>
+        throw new Exception(s"Invalid transition $transition")
+    }
+  }
+
+  // this does allow for error; consider the case where a (proper, geo) rectangle
+  // has a lower-right corner that is almost (but not) touching the left ascent of
+  // this trapezoid:  this routine will falsely claim that the shapes everlap
+  def geoOverlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
+    // coarse definition
+    if (geoX0 > xmax) return false
+    if (geoX1 < xmin) return false
+    if (y0 > ymax) return false
+    if (y1 < ymin) return false
     true
+  }
+
+  def containsGeoPoint(x: Double, y: Double): Boolean =
+    geoOverlaps(x, y, x, y)
+
+  def containsGeoX(x: Double): Boolean = x >= geoX0 && x <= geoX1
+
+  def containsOctX(x: Double): Boolean = x >= octX0 && x <= octX1
+
+  def containsY(y: Double): Boolean = y >= y0 && y <= y1
+
+  def areaSquareDegrees: Double = 0.5 * Math.abs(geoX1 - geoX0) * Math.abs(y1 - y0)
+
+  def areaSquareMeters: Double = {
+    val dxDeg = Math.abs(geoX1 - geoX0)
+    val dyDeg = Math.abs(y1 - y0)
+    val yDeg = 0.5 * (y1 + y0)
+    val dyM = dyDeg * 111.32 * 1000.0
+    val dxM = dxDeg * Math.cos(Math.toRadians(yDeg)) * 111.32 * 1000.0
+    0.5 * dyM * dxM
+  }
+
+  def octWkt(orientation: Int): String = orientation match {
+    case A_BC | A_CB | B_AC | B_CA | C_AB | C_BA =>
+      // apex on top
+      s"POLYGON((${octXMid} ${Y.max}, ${octX1} ${Y.min}, ${octX0} ${Y.min}, ${octXMid} ${Y.max}))"
+    case AB_C | AC_B | BA_C | BC_A | CA_B | CB_A =>
+      // apex on bottom
+      s"POLYGON((${octX0} ${Y.max}, ${octX1} ${Y.max}, ${octXMid} ${Y.min}, ${octX0} ${Y.max}))"
+    case _ =>
+      throw new Exception(s"Invalid orientation $orientation")
+  }
+
+  def geoWkt(orientation: Int): String = orientation match {
+    case A_BC | A_CB | B_AC | B_CA | C_AB | C_BA =>
+      // apex on top
+      s"POLYGON((${geoXApex.min} ${Y.max}, ${geoXApex.max} ${Y.max}, ${geoXBase.max} ${Y.min}, ${geoXBase.min} ${Y.min}, ${geoXApex.min} ${Y.max}))"
+    case AB_C | AC_B | BA_C | BC_A | CA_B | CB_A =>
+      // apex on bottom
+      s"POLYGON((${geoXBase.min} ${Y.max}, ${geoXBase.max} ${Y.max}, ${geoXApex.max} ${Y.min}, ${geoXApex.min} ${Y.min}, ${geoXBase.min} ${Y.max}))"
+    case _ =>
+      throw new Exception(s"Invalid orientation $orientation")
   }
 }
 
-case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[Double], depth: Int) extends SpaceFillingCurve2D(depth * 3) with InMemoryRangeConsolidator {
-  val x0: Double = X.min
-  val x1: Double = X.max
-  val xMid: Double = 0.5 * (x0 + x1)
-  val x14: Double = 0.75 * x0 + 0.25 * x1
-  val x34: Double = 0.25 * x0 + 0.75 * x1
+/**
+  *
+  * @param index
+  * @param orientation
+  * @param bounds:  the geographic and octahedral bounds of this triangle
+  * @param depth
+  */
+case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int) extends SpaceFillingCurve2D(depth * 3) with InMemoryRangeConsolidator {
+  implicit def octX0: Double = bounds.octX0
+  implicit def octX1: Double = bounds.octX1
+  implicit def octXMid: Double = bounds.octXMid
+  implicit def octX14: Double = bounds.octX14
+  implicit def octX34: Double = bounds.octX34
+
   val (y0: Double, y1: Double, mLeftInv: Double, mRightInv: Double) = if (isApexUp(orientation)) {
-    (Y.min, Y.max, MNegInv, MPosInv)
+    (bounds.Y.min, bounds.Y.max, MNegInv, MPosInv)
   } else {
-    (Y.max, Y.min, MPosInv, MNegInv)
+    (bounds.Y.max, bounds.Y.min, MPosInv, MNegInv)
   }
   val yMid: Double = 0.5 * (y0 + y1)
-
-  lazy val octahedronFace: Triangle = TriN.getInitialTriangle(xMid, yMid)
-  lazy val octahedronXRange: Extent[Double] = octahedronFace.X
-  lazy val xt0: Double = TriN.getXTInv(Math.min(x0, x1), Math.min(Math.abs(y0), Math.abs(y1)), octahedronXRange)
-  lazy val xt1: Double = TriN.getXTInv(Math.max(x0, x1), Math.min(Math.abs(y0), Math.abs(y1)), octahedronXRange)
 
   override val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
 
@@ -69,43 +156,15 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
   def bitString: String = indexBinaryString(index, depth)
 
-  def xtInverse: Double = {
-    val result = TriN.getXTInv(xMid, yMid, octahedronXRange)
-    //println(s"xtInverse($xMid, $yMid, $X) -> $result")
-    result
-  }
-
-  def contains(x: Double, y: Double): Boolean = {
-    if (x < Math.min(x0, x1)) return false
-    if (x > Math.max(x0, x1)) return false
-    if (y < Math.min(y0, y1)) return false
-    if (y > Math.max(y0, y1)) return false
-    true
-  }
-
-  def overlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
-    if (xt0 > xmax) return false
-    if (xt1 < xmin) return false
-    if (Math.min(y0, y1) > ymax) return false
-    if (Math.max(y0, y1) < ymin) return false
-    true
-  }
-
   // degenerate for the Curve contract
   override def toIndex(x: Double, y: Double): Long = {
     TriN.index(x, y, depth)
   }
 
   // degenerate for the Curve contract
-  override def toPoint(index: Long): (Double, Double) = {
-    val t = TriN.invIndex(index, depth)
-    (t.xtInverse, t.yMid)
-  }
+  override def toPoint(index: Long): (Double, Double) = bounds.geoCenter
 
-  def rectangle: Rectangle = {
-
-  }
-
+  // every triangle has four smaller sub-triangle children
   def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
 
   // called by TriN and itself
@@ -118,10 +177,10 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
     if (depth > maxDepth) throw new Exception("Should not be able to recurse this far")
 
     // find your children that intersect the query area
-    val subs = childTriangles.filter(_.overlaps(xmin, ymin, xmax, ymax))
+    val subs = childTriangles.filter(_.bounds.geoOverlaps(xmin, ymin, xmax, ymax))
     if (subs.isEmpty) {
-
-      return Seq[IndexRange]()
+      throw new Exception(s"Parent overlaps geo bounds, but no child does")
+      //return Seq[IndexRange]()
     }
 
     // recurse, and combine the results
@@ -137,26 +196,6 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
 
     // defer to the companion object to do this planning top-down
     TriN.getRanges(xmin, ymin, xmax, ymax, depth)
-
-/*
-    // TODO make this not be brute force and ignorance!
-    var tOpt: Option[Triangle] = Option(TriN.createLowestIndex(depth))
-    var result: collection.mutable.ArrayBuffer[IndexRange] = new collection.mutable.ArrayBuffer
-    while (tOpt.isDefined) {
-      if (tOpt.get.overlaps(xmin, ymin, xmax, ymax)) {
-        //TODO figure out a better solution for "contained = true"
-        result.append(IndexRange(tOpt.get.index, tOpt.get.index, contained = true))
-      }
-      tOpt = tOpt.get.next
-    }
-    if (result.size < 1) {
-      throw new Error(s"Failed to find Triangle range:  X($xmin, $xmax), Y($ymin, $ymax)!")
-    }
-    result.toSeq
-
-    // do the in-memory ordering and consolidation of these index ranges
-    consolidateRanges(result.iterator).toSeq
-*/
   }
 
   def fold(subordinates: Seq[Long]): Long = throw new Exception("DO NOT CALL Triangle.fold")
@@ -167,17 +206,6 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
   def stackIndex(nextIndex: Long): Long = (index << 3) | (nextIndex & 7)
 
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
-
-  def areaSquareDegrees: Double = 0.5 * Math.abs(x1 - x0) * Math.abs(y1 - y0)
-
-  def areaSquareMeters: Double = {
-    val dxDeg = Math.abs(x1 - x0)
-    val dyDeg = Math.abs(y1 - y0)
-    val yDeg = 0.5 * (y1 + y0)
-    val dyM = dyDeg * 111.32 * 1000.0
-    val dxM = dxDeg * Math.cos(Math.toRadians(yDeg)) * 111.32 * 1000.0
-    0.5 * dyM * dxM
-  }
 
   def next: Option[Triangle] = {
     //println(s"Triangle.next from $bitString...")
@@ -216,73 +244,85 @@ case class Triangle(index: Long, orientation: Int, X: Extent[Double], Y: Extent[
       case _ => throw new Exception("Invalid transition $transition")
     })
 
+    val childBounds = bounds.childBounds(isApexUp(orientation), transition)
+
     transition match {
-      case TransCenter => Triangle(nextIndex, nextOrientation(TransCenter), Extent(x14, x34), makeExtent(y0, yMid), depth + 1)
-      case TransApex =>   Triangle(nextIndex, nextOrientation(TransApex), Extent(x14, x34), makeExtent(yMid, y1), depth + 1)
-      case TransLL =>     Triangle(nextIndex, nextOrientation(TransLL), Extent(x0, xMid), makeExtent(y0, yMid), depth + 1)
-      case TransLR =>     Triangle(nextIndex, nextOrientation(TransLR), Extent(xMid, x1), makeExtent(y0, yMid), depth + 1)
-      case _ =>           throw new Exception(s"Invalid transition $transition")
+      case TransCenter => Triangle(nextIndex, nextOrientation(TransCenter), childBounds, depth + 1)
+      case TransApex => Triangle(nextIndex, nextOrientation(TransApex), childBounds, depth + 1)
+      case TransLL => Triangle(nextIndex, nextOrientation(TransLL), childBounds, depth + 1)
+      case TransLR => Triangle(nextIndex, nextOrientation(TransLR), childBounds, depth + 1)
+      case _ => throw new Exception(s"Invalid transition $transition")
     }
   }
 
-  def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
-    require(X.contains(x), s"X is out of bounds:  $x notIn $X")
-    require(Y.contains(y), s"Y is out of bounds:  $y notIn $Y")
+  // assumes that you've ALREADY transformed X into octahedral form!
+  def getTriangle(octX: Double, y: Double, maxDepth: Int): Triangle = {
+    require(bounds.containsOctX(octX), s"X is out of bounds:  $octX")
+    require(bounds.containsY(y), s"Y is out of bounds:  $y notIn ${bounds.Y}")
 
     if (maxDepth < 1) return this
 
     // apex
     if (Math.abs(y - y1) < Math.abs(y - y0)) {
-      require(x >= x14 && x <= x34, s"Cannot recurse into apex, X $x is out of range ($x14, $x34)")
-      return child(TransApex).getTriangle(x, y, maxDepth - 1)
+      require(octX >= octX14 && octX <= octX34, s"Cannot recurse into apex, X $octX is out of range ($octX14, $octX34)")
+      return child(TransApex).getTriangle(octX, y, maxDepth - 1)
     }
 
     // you know you're recursing into the base
 
     // check left and right
-    if (x < xMid) {
+    if (octX < octXMid) {
       // check left
-      if (x < x14) {
-        return child(TransLL).getTriangle(x, y, maxDepth - 1)
+      if (octX < octX14) {
+        return child(TransLL).getTriangle(octX, y, maxDepth - 1)
       }
-      val xProbe: Double = mLeftInv * (y - y0) + xMid
-      if (xProbe >= x0 && xProbe < xMid && x < xProbe) {
-        return child(TransLL).getTriangle(x, y, maxDepth - 1)
+      val xProbe: Double = mLeftInv * (y - y0) + octXMid
+      if (xProbe >= octX0 && xProbe < octXMid && octX < xProbe) {
+        return child(TransLL).getTriangle(octX, y, maxDepth - 1)
       }
     } else {
       // check right
-      if (x > x34) {
-        return child(TransLR).getTriangle(x, y, maxDepth - 1)
+      if (octX > octX34) {
+        return child(TransLR).getTriangle(octX, y, maxDepth - 1)
       }
-      val xProbe: Double = mRightInv * (y - y0) + xMid
-      if (xProbe >= xMid && xProbe <= x1 && x >= xProbe) {
-        return child(TransLR).getTriangle(x, y, maxDepth - 1)
+      val xProbe: Double = mRightInv * (y - y0) + octXMid
+      if (xProbe >= octXMid && xProbe <= octX1 && octX >= xProbe) {
+        return child(TransLR).getTriangle(octX, y, maxDepth - 1)
       }
     }
 
     // if you get this far, recurse center
-    child(TransCenter).getTriangle(x, y, maxDepth - 1)
+    child(TransCenter).getTriangle(octX, y, maxDepth - 1)
   }
 
-  def polygonPoints: String = orientation match {
-    case A_BC | A_CB | B_AC | B_CA | C_AB | C_BA =>
-      // apex on top
-      s"${xMid} ${Y.max}, ${X.max} ${Y.min}, ${X.min} ${Y.min}, ${xMid} ${Y.max}"
-    case AB_C | AC_B | BA_C | BC_A | CA_B | CB_A =>
-      // apex on bottom
-      s"${X.min} ${Y.max}, ${X.max} ${Y.max}, ${xMid} ${Y.min}, ${X.min} ${Y.max}"
-    case _ =>
-      throw new Exception(s"Invalid orientation $orientation")
-  }
+  def geoWkt: String = bounds.geoWkt(orientation)
 
-  def wkt: String = {
-    "POLYGON((" + polygonPoints + "))"
-  }
+  def octWkt: String = bounds.octWkt(orientation)
 }
 
 object TriN {
-  val TriTopLongitude = Longitude(4)
-  val TriTopLatitude = Latitude(2)
+  // PMLP for working with Extent[Double] ranges for geo-, oct-coordinates
+  implicit class RichExtent(extent: Extent[Double]) {
+    def span: Double = extent.max - extent.min
+
+    def q0: Double = extent.min
+    def q1: Double = 0.75 * extent.min + 0.25 * extent.max
+    def q2: Double = 0.5 * (extent.min + extent.max)
+    def q3: Double = 0.25 * extent.min + 0.75 * extent.max
+    def q4: Double = extent.max
+
+    def subQ1: Extent[Double] = Extent(q0, q1)
+    def subQ2: Extent[Double] = Extent(q1, q2)
+    def subQ3: Extent[Double] = Extent(q2, q3)
+    def subQ4: Extent[Double] = Extent(q3, q4)
+
+    def subH0: Extent[Double] = Extent(q0, q2)
+    def subH1: Extent[Double] = Extent(q1, q3)
+    def subH2: Extent[Double] = Extent(q2, q4)
+  }
+
+  val TriTopLongitude: Longitude = Longitude(4)
+  val TriTopLatitude: Latitude = Latitude(2)
 
   // corners
   val A = 1
@@ -500,9 +540,10 @@ object TriN {
 
   val OctahedronFaces: Vector[Triangle] = (0 to 7).map(face => invIndex(face, 1)).toVector
 
+  // assume these are GEOGRAPHIC X-coordinates, /not/ octahedral X-coordinates
   def getRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
     // find the top-level octahedron faces that intersect the query region at all
-    val faces: Vector[Triangle] = OctahedronFaces.filter(t => t.overlaps(xmin, ymin, xmax, ymax))
+    val faces: Vector[Triangle] = OctahedronFaces.filter(t => t.bounds.geoOverlaps(xmin, ymin, xmax, ymax))
     if (faces.isEmpty) throw new Exception("Triangle query did not match any octahedral faces!")
 
     // recurse, and combine results
@@ -512,66 +553,56 @@ object TriN {
     })
   }
 
-  def overlaps(triangle: Triangle, xmin: Double, xmax: Double, ymin: Double, ymax: Double): Boolean = {
-    val txmin = Math.min(triangle.x0, triangle.x1)
-    val txmax = Math.max(triangle.x0, triangle.x1)
-    val tymin = Math.min(triangle.y0, triangle.y1)
-    val tymax = Math.max(triangle.y0, triangle.y1)
-    // easy exclusions
-    if (txmax < xmin) return false
-    if (txmin > xmax) return false
-    if (tymax < ymin) return false
-    if (tymin > ymax) return false
-    // TODO make this more refined; it's not necessary that they overlap at this point, because of the angles
-    true
-  }
-
   // map the given (x, y) coordinate to one face of the octahedron
   // that wraps the entire (spherical) Earth
-  def getInitialTriangle(x: Double, y: Double): Triangle = {
-    val ix = TriTopLongitude.index(Seq(x))
+  // assume that this is a GEOGRAPHIC X-coordinate
+  def getInitialTriangle(geoX: Double, y: Double): Triangle = {
+    val ix = TriTopLongitude.index(Seq(geoX))
     val iy = TriTopLatitude.index(Seq(y))
     val orientation: Int = topOrientation(ix.toInt, iy.toInt)
     val idx: Long = (iy << 2) | (if (ix < 2) ix else 5 - ix)
     val x0: Double = -180.0 + 90.0 * ix
     val y0: Double = -90.0 + 90.0 * iy
-    Triangle(idx, orientation, Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
+    // the octahedral face is a weird case where the APEX bounds are also 90 degrees wide!
+    val bounds: TriBounds = TriBounds(Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0))
+    Triangle(idx, orientation, bounds, 1)
   }
 
-  def getXT(x: Double, y: Double): Double = {
-    val t0: Triangle = getInitialTriangle(x, y)
-    getXT(x, y, t0.X)
-  }
+  def geoToOctX(geoX: Double, y: Double): Double = {
+    // the octahedral faces are all 90 degrees wide, so you just need to pick the
+    // right 90-degree range that includes the given geoX
+    val geoX0: Double = 90.0 * Math.floor(Math.max(-180.0, Math.min(179.999999, geoX)) / 90.0)
 
-  def getXT(x: Double, y: Double, X: Extent[Double]): Double = {
-    val dx = X.max - X.min
+    // given the range minimum, transform the geo-X into an oct-X
     val pY = (90.0 - Math.abs(y)) / 90.0
-    val xMid = X.min + 0.5 * dx
-    val xT = xMid - pY * (xMid - x)
-    xT
+    val xMid = geoX0 + 45.0
+    val octX = xMid - pY * (xMid - geoX)
+    octX
   }
 
-  def getXTInv(x: Double, y: Double): Double = {
-    val t0: Triangle = getInitialTriangle(x, y)
-    getXTInv(x, y, t0.X)
-  }
+  def octToGeoX(octX: Double, y: Double): Double = {
+    // the octahedral faces are all 90 degrees wide, so you just need to pick the
+    // right 90-degree range that includes the given geoX
+    val geoX0: Double = 90.0 * Math.floor(Math.max(-180.0, Math.min(179.999999, octX)) / 90.0)
 
-  def getXTInv(xT: Double, y: Double, X: Extent[Double]): Double = {
-    val dx = X.max - X.min
+    // given the range minimum, transform the geo-X into an oct-X
     val pY = (90.0 - Math.abs(y)) / 90.0
-    val xMid = X.min + 0.5 * dx
-    val x = if (pY > 1e-6) xMid - (xMid - xT) / pY else xT
-    x
+    // mind the potential division-by-zero
+    if (pY < 1e-6) return octX
+    val xMid = geoX0 + 45.0
+    val geoX = xMid - (xMid - octX) / pY
+    geoX
   }
 
-  def getTriangle(x: Double, y: Double, maxDepth: Int): Triangle = {
+  // assume you've given a GEOGRAPHIC X-coordinate
+  def getTriangle(geoX: Double, y: Double, maxDepth: Int): Triangle = {
     require(maxDepth > 0, s"maxDepth must be at least one; found $maxDepth")
-    val t0 = getInitialTriangle(x, y)
+    val octFace = getInitialTriangle(geoX, y)
     if (maxDepth > 1) {
-      val result = t0.getTriangle(getXT(x, y, t0.X), y, maxDepth - 1)
+      val result = octFace.getTriangle(geoToOctX(geoX, y), y, maxDepth - 1)
       result
     } else {
-      val result = t0
+      val result = octFace
       result
     }
   }
@@ -579,8 +610,9 @@ object TriN {
   def indexBinaryString(index: Long, depth: Int): String =
     index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
 
-  def index(x: Double, y: Double, maxDepth: Int): Long = {
-    getTriangle(x, y, maxDepth).index
+  // assume you've given a GEOGRAPHIC X-coordinate
+  def index(geoX: Double, y: Double, maxDepth: Int): Long = {
+    getTriangle(geoX, y, maxDepth).index
   }
 
   def invIndex(idx: Long, depth: Int): Triangle = {
@@ -592,9 +624,10 @@ object TriN {
     val octYi = (octIdx >> 2) & 1
     val x0 = octXi * 90.0 - 180.0
     val y0 = octYi * 90.0 - 90.0
-    val t0: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), 1)
+    val bounds: TriBounds = TriBounds(Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0))
+    val octFace: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), bounds, 1)
 
-    (depth - 2  to 0 by -1).foldLeft(t0)((acc, i) => {
+    (depth - 2  to 0 by -1).foldLeft(octFace)((acc, i) => {
       val corner = (idx >> (3 * i)) & 7
       acc.child(TransitionsByOrientationCorner((acc.orientation, corner.toInt)))
     })
@@ -617,15 +650,10 @@ object TriN {
     })
   }
 
-  def lineWkt(t0: Triangle, t1: Triangle): String =
+  def geoLineWkt(t0: Triangle, t1: Triangle): String =
     "LINESTRING(" +
-      (t0.X.min * 0.50 + t0.X.max * 0.50) +
-      " " +
-      (t0.Y.min * 0.50 + t0.Y.max * 0.50) +
-      ", " +
-      (t1.X.min * 0.50 + t1.X.max * 0.50) +
-      " " +
-      (t1.Y.min * 0.50 + t1.Y.max * 0.50) +
+      t0.bounds.geoXMid + " " + t0.bounds.yMid + ", " +
+      t1.bounds.geoXMid + " " + t1.bounds.yMid +
       ")"
 }
 
@@ -763,14 +791,14 @@ object TriTest extends App {
     }
   }
 
-  def testInitialTri(n: Int, x: Double, y: Double): Unit = {
-    val t = getTriangle(x, y, 1)
-    val bIndex = t.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
-    val xT = getXT(x, y, t.X)
-    val x2 = getXTInv(xT, y, t.X)
-    pw.println(f"$n%d\tPOINT($x%1.4f $y%1.4f)\tPOINT($xT%1.4f $y%1.4f)\t$bIndex%s")
+  def testInitialTri(n: Int, geoX: Double, y: Double): Unit = {
+    val octFace = getTriangle(geoX, y, 1)
+    val bIndex = octFace.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
+    val octX = geoToOctX(geoX, y)
+    val x2 = octToGeoX(octX, y)
+    pw.println(f"$n%d\tPOINT($geoX%1.4f $y%1.4f)\tPOINT($octX%1.4f $y%1.4f)\t$bIndex%s")
     if (Math.abs(y) < 89.5) {
-      require(Math.abs(x2 - x) <= 1e-6, f"Failed to satisfy XT inverse:  $x%1.6f <> $xT%1.6f")
+      require(Math.abs(x2 - geoX) <= 1e-6, f"Failed to satisfy XT inverse:  $geoX%1.6f <> $octX%1.6f")
     }
   }
 
@@ -778,9 +806,9 @@ object TriTest extends App {
     pw = new PrintWriter(new FileWriter("test-points.txt"))
     pw.println("name\torig_wkt\toct_wkt")
     LocationsByName.foreach {
-      case (name, LatLon(y, x)) =>
-        val t = getInitialTriangle(x, y)
-        pw.println(s"$name\tPOINT($x $y)\tPOINT(${getXT(x, y, t.X)} $y)")
+      case (name, LatLon(y, geoX)) =>
+        val t = getInitialTriangle(geoX, y)
+        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(geoX, y)} $y)")
     }
     pw.close()
 
@@ -818,7 +846,7 @@ object TriTest extends App {
     (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target.longitude, target.latitude, depth)
-        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.wkt + "\t" + t.areaSquareDegrees + "\t" + t.areaSquareMeters)
+        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.bounds.geoWkt(t.orientation) + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
         (x, y)
     })
     pw.close()
@@ -826,7 +854,7 @@ object TriTest extends App {
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
     pw.println("orientation\tindex_dec\tindex_bits\twkt")
     for (t <- iterator(4)) {
-      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.wkt}")
+      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.bounds.geoWkt(t.orientation)}")
     }
     pw.close()
 
@@ -834,7 +862,7 @@ object TriTest extends App {
     pw.println("index_from\tindex_to\twkt")
     for (t <- iterator(4).sliding(2, 1)) t match {
       case Seq(t0, t1) =>
-        pw.println(s"${t0.index}\t${t1.index}\t${lineWkt(t0, t1)}")
+        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}")
     }
     pw.close()
 
