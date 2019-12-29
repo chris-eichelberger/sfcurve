@@ -142,8 +142,9 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   def bitString: String = indexBinaryString(index, depth)
 
   // degenerate for the Curve contract
-  override def toIndex(x: Double, y: Double): Long = {
-    TriN.index(x, y, depth)
+  // assumes that you are given GEOGRAPHIC coordinates!
+  override def toIndex(geoX: Double, y: Double): Long = {
+    TriN.index(geoX, y, depth)
   }
 
   // degenerate for the Curve contract
@@ -153,6 +154,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
 
   // called by TriN and itself
+  // assumes that you are given GEOGRAPHIC coordinates!
   def getRangesRecursively(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
     // check stop conditions
     if (depth == maxDepth) {
@@ -175,6 +177,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   }
 
   // degenerate for the Curve contract
+  // assumes that you are given GEOGRAPHIC coordinates!
   override def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
     require(xmin <= xmax)
     require(ymin <= ymax)

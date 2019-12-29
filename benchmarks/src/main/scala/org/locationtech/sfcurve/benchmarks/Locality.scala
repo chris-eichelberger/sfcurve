@@ -343,12 +343,19 @@ object Locality extends App {
   // more unit tests
   {
     println(s"\nMore triangle unit tests...")
-    val idx = t2.toIndex(-78.495150, 38.075776)
-    println(s"  Index CCRi:  $idx")
-    val t = t2.toPoint(idx)
+
+//    val idx = t2.toIndex(-78.495150, 38.075776)
+//    println(s"  Index CCRi:  $idx")
+//    val t = t2.toPoint(idx)
+    val depth = 4
+    val idx = TriN.index(-78.495150, 38.075776, depth)
+    println(s"  Index CCRi:  $idx decimal, ${TriN.indexOctalString(idx, depth)}")
+    val t = TriN.invIndex(idx, depth)
+    val point = t.bounds.geoCenter
+
     println(s"  From index:  $t")
-    assert(Math.abs(t._1 - -78.495150) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
-    assert(Math.abs(t._2 - 38.075776) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
+    println(s"    centroid:  $point")
+    System.exit(-1)
   }
 
   // application
