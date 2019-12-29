@@ -257,8 +257,8 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
 
   // assumes that you've ALREADY transformed X into octahedral form!
   def getTriangle(octX: Double, y: Double, maxDepth: Int): Triangle = {
-    require(bounds.containsOctX(octX), s"X is out of bounds:  $octX")
-    require(bounds.containsY(y), s"Y is out of bounds:  $y notIn ${bounds.Y}")
+    require(bounds.containsOctX(octX), s"X is out of bounds:  $octX notIn $bounds")
+    require(bounds.containsY(y), s"Y is out of bounds:  $y notIn $bounds")
 
     if (maxDepth < 1) return this
 
@@ -571,7 +571,10 @@ object TriN {
   def geoToOctX(geoX: Double, y: Double): Double = {
     // the octahedral faces are all 90 degrees wide, so you just need to pick the
     // right 90-degree range that includes the given geoX
-    val geoX0: Double = 90.0 * Math.floor(Math.max(-180.0, Math.min(179.999999, geoX)) / 90.0)
+    val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, geoX))) / 90.0) - 180.0
+
+    //TODO remove
+    println(s"geoToOctX($geoX, $y):  geoX0 $geoX0")
 
     // given the range minimum, transform the geo-X into an oct-X
     val pY = (90.0 - Math.abs(y)) / 90.0
@@ -583,7 +586,10 @@ object TriN {
   def octToGeoX(octX: Double, y: Double): Double = {
     // the octahedral faces are all 90 degrees wide, so you just need to pick the
     // right 90-degree range that includes the given geoX
-    val geoX0: Double = 90.0 * Math.floor(Math.max(-180.0, Math.min(179.999999, octX)) / 90.0)
+    val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, octX))) / 90.0) - 180.0
+
+    //TODO remove
+    println(s"octToGeoX($octX, $y):  geoX0 $geoX0")
 
     // given the range minimum, transform the geo-X into an oct-X
     val pY = (90.0 - Math.abs(y)) / 90.0
