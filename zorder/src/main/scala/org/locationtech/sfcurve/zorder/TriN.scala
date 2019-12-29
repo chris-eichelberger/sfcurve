@@ -54,11 +54,10 @@ case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: E
 
   def octCenter: (Double, Double) = (octXMid, yMid)
 
-  def geoBaseXQ0AsExtent: Extent[Double] = Extent(geoXBase.q0, geoXBase.q0)
-  def geoBaseXQ1AsExtent: Extent[Double] = Extent(geoXBase.q1, geoXBase.q1)
-  def geoBaseXQ2AsExtent: Extent[Double] = Extent(geoXBase.q2, geoXBase.q2)
-  def geoBaseXQ3AsExtent: Extent[Double] = Extent(geoXBase.q3, geoXBase.q3)
-  def geoBaseXQ4AsExtent: Extent[Double] = Extent(geoXBase.q4, geoXBase.q4)
+  def geoXAtMidY: Extent[Double] = Extent(
+    0.5 * (geoXApex.min + geoXBase.min),
+    0.5 * (geoXApex.max + geoXBase.max)
+  )
 
   // this does allow for error; consider the case where a (proper, geo) rectangle
   // has a lower-right corner that is almost (but not) touching the left ascent of
@@ -256,28 +255,32 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     val childBounds = transition match {
       case TransCenter =>
         //Extent(octX14, octX34), makeExtent(y0, yMid)
-        if (isAllApex)
-          TriBounds(bounds.geoBaseXQ2AsExtent, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
-        else
-          TriBounds(bounds.geoBaseXQ2AsExtent, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+        if (isAllApex) {
+          TriBounds(bounds.geoXBase, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+        } else {
+          TriBounds(bounds.geoXBase.peq2, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+        }
       case TransApex =>
         //Extent(octX14, octX34), makeExtent(yMid, y1)
-        if (isAllApex)
+        if (isAllApex) {
           TriBounds(bounds.geoXApex, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
-        else
-          TriBounds(bounds.geoBaseXQ2AsExtent, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
+        } else {
+          TriBounds(bounds.geoXApex, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
+        }
       case TransLL =>
         //Extent(octX0, octXMid), makeExtent(y0, yMid)
-        if (isAllApex)
-          TriBounds(bounds.geoBaseXQ0AsExtent, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
-        else
-          TriBounds(bounds.geoBaseXQ1AsExtent, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+        if (isAllApex) {
+          TriBounds(bounds.geoXAtMidY.peq0, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+        } else {
+          TriBounds(bounds.geoXAtMidY.peq0, bounds.geoXAtMidY.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+        }
       case TransLR =>
         //Extent(octXMid, octX1), makeExtent(y0, yMid)
-        if (isAllApex)
-          TriBounds(bounds.geoBaseXQ4AsExtent, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
-        else
-          TriBounds(bounds.geoBaseXQ3AsExtent, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+        if (isAllApex) {
+          TriBounds(bounds.geoXAtMidY.peq4, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+        } else {
+          TriBounds(bounds.geoXAtMidY.peq4, bounds.geoXAtMidY.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+        }
       case _ =>
         throw new Exception(s"Invalid transition $transition")
     }
@@ -355,6 +358,12 @@ object TriN {
     def subH0: Extent[Double] = Extent(q0, q2)
     def subH1: Extent[Double] = Extent(q1, q3)
     def subH2: Extent[Double] = Extent(q2, q4)
+
+    def peq0: Extent[Double] = Extent(q0, q0)
+    def peq1: Extent[Double] = Extent(q1, q1)
+    def peq2: Extent[Double] = Extent(q2, q2)
+    def peq3: Extent[Double] = Extent(q3, q3)
+    def peq4: Extent[Double] = Extent(q4, q4)
   }
 
   val TriTopLongitude: Longitude = Longitude(4)
@@ -907,9 +916,9 @@ object TriTest extends App {
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
-    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt")
-    for (t <- iterator(2)) {
-      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
+    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tis_all_apex")
+    for (t <- iterator(3)) {
+      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
     }
     pw.close()
 
