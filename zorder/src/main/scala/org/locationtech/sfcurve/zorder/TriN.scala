@@ -54,25 +54,9 @@ case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: E
 
   def octCenter: (Double, Double) = (octXMid, yMid)
 
-  def childBounds(isParentApexUp: Boolean, transition: Int): TriBounds = {
-    //TODO figure out how to handle apex/base switching at the poles!
-    transition match {
-      case TransCenter =>
-        //Extent(octX14, octX34), makeExtent(y0, yMid)
-        TriBounds(geoXApex.subH1, geoXBase.subH1, octX.subH1, TriN.makeExtent(y0, yMid))
-      case TransApex =>
-        //Extent(octX14, octX34), makeExtent(yMid, y1)
-        TriBounds(geoXApex.subH1, geoXBase.subH1, octX.subH1, TriN.makeExtent(yMid, y1))
-      case TransLL =>
-        //Extent(octX0, octXMid), makeExtent(y0, yMid)
-        TriBounds(geoXApex.subH0, geoXBase.subH0, octX.subH0, TriN.makeExtent(y0, yMid))
-      case TransLR =>
-        //Extent(octXMid, octX1), makeExtent(y0, yMid)
-        TriBounds(geoXApex.subH2, geoXBase.subH2, octX.subH2, TriN.makeExtent(y0, yMid))
-      case _ =>
-        throw new Exception(s"Invalid transition $transition")
-    }
-  }
+  def geoApexXMidpointAsExtent: Extent[Double] = Extent(geoXApex.q2, geoXApex.q2)
+
+  def geoBaseXMidpointAsExtent: Extent[Double] = Extent(geoXBase.q2, geoXBase.q2)
 
   // this does allow for error; consider the case where a (proper, geo) rectangle
   // has a lower-right corner that is almost (but not) touching the left ascent of
@@ -207,6 +191,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
 
   def nextOrientation(transition: Int): Int = OrientationTransitions((orientation, transition))
 
+  // returns the triangle (if available) corresponding to the next valid index
   def next: Option[Triangle] = {
     //println(s"Triangle.next from $bitString...")
     val transitions: Vector[Int] = bitString.sliding(3,3).map(bbb => BitStrings(bbb)).toVector
@@ -235,6 +220,13 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     result
   }
 
+  /**
+    * This is one of the key methods in the entire class; it defines how the geographic
+    * and octahedral coordinate boundaries change as you recurse into child triangles.
+    *
+    * @param transition which child you are recursing into
+    * @return the properly formatted child triangle
+    */
   def child(transition: Int): Triangle = {
     val nextIndex = stackIndex(transition match {
       case TransCenter => Center
@@ -244,7 +236,24 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
       case _ => throw new Exception("Invalid transition $transition")
     })
 
-    val childBounds = bounds.childBounds(isApexUp(orientation), transition)
+    //TODO figure out how to handle apex/base switching at the poles!
+    val childBounds = transition match {
+      case TransCenter =>
+        //Extent(octX14, octX34), makeExtent(y0, yMid)
+        // base and apex exchange for the center child
+        TriBounds(bounds.geoBaseXMidpointAsExtent, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+      case TransApex =>
+        //Extent(octX14, octX34), makeExtent(yMid, y1)
+        TriBounds(bounds.geoXApex, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
+      case TransLL =>
+        //Extent(octX0, octXMid), makeExtent(y0, yMid)
+        TriBounds(bounds.geoBaseXMidpointAsExtent, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+      case TransLR =>
+        //Extent(octXMid, octX1), makeExtent(y0, yMid)
+        TriBounds(bounds.geoBaseXMidpointAsExtent, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+      case _ =>
+        throw new Exception(s"Invalid transition $transition")
+    }
 
     transition match {
       case TransCenter => Triangle(nextIndex, nextOrientation(TransCenter), childBounds, depth + 1)
