@@ -54,9 +54,11 @@ case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: E
 
   def octCenter: (Double, Double) = (octXMid, yMid)
 
-  def geoApexXMidpointAsExtent: Extent[Double] = Extent(geoXApex.q2, geoXApex.q2)
-
-  def geoBaseXMidpointAsExtent: Extent[Double] = Extent(geoXBase.q2, geoXBase.q2)
+  def geoBaseXQ0AsExtent: Extent[Double] = Extent(geoXBase.q0, geoXBase.q0)
+  def geoBaseXQ1AsExtent: Extent[Double] = Extent(geoXBase.q1, geoXBase.q1)
+  def geoBaseXQ2AsExtent: Extent[Double] = Extent(geoXBase.q2, geoXBase.q2)
+  def geoBaseXQ3AsExtent: Extent[Double] = Extent(geoXBase.q3, geoXBase.q3)
+  def geoBaseXQ4AsExtent: Extent[Double] = Extent(geoXBase.q4, geoXBase.q4)
 
   // this does allow for error; consider the case where a (proper, geo) rectangle
   // has a lower-right corner that is almost (but not) touching the left ascent of
@@ -220,6 +222,20 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     result
   }
 
+  // the geo coordinates work funny for the region that includes the poles;
+  // for a triangle tiling, this really just means the 8 portions (one per
+  // oct face) that are furthest from the equator... in other words, no
+  // matter your depth, these are the children you reached by only ever
+  // recursing into the Apex starting from an oct face
+  def isAllApex: Boolean = {
+    if (depth == 1) return true
+    for (i <- depth - 1 to 0 by -1) {
+      val transition: Long = (index >> (3 * i)) & 3
+      if (transition != TransApex) return false
+    }
+    true
+  }
+
   /**
     * This is one of the key methods in the entire class; it defines how the geographic
     * and octahedral coordinate boundaries change as you recurse into child triangles.
@@ -240,17 +256,28 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     val childBounds = transition match {
       case TransCenter =>
         //Extent(octX14, octX34), makeExtent(y0, yMid)
-        // base and apex exchange for the center child
-        TriBounds(bounds.geoBaseXMidpointAsExtent, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+        if (isAllApex)
+          TriBounds(bounds.geoBaseXQ2AsExtent, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
+        else
+          TriBounds(bounds.geoBaseXQ2AsExtent, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
       case TransApex =>
         //Extent(octX14, octX34), makeExtent(yMid, y1)
-        TriBounds(bounds.geoXApex, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
+        if (isAllApex)
+          TriBounds(bounds.geoXApex, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
+        else
+          TriBounds(bounds.geoBaseXQ2AsExtent, bounds.geoXBase.subH1, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
       case TransLL =>
         //Extent(octX0, octXMid), makeExtent(y0, yMid)
-        TriBounds(bounds.geoBaseXMidpointAsExtent, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+        if (isAllApex)
+          TriBounds(bounds.geoBaseXQ0AsExtent, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+        else
+          TriBounds(bounds.geoBaseXQ1AsExtent, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
       case TransLR =>
         //Extent(octXMid, octX1), makeExtent(y0, yMid)
-        TriBounds(bounds.geoBaseXMidpointAsExtent, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+        if (isAllApex)
+          TriBounds(bounds.geoBaseXQ4AsExtent, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+        else
+          TriBounds(bounds.geoBaseXQ3AsExtent, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
       case _ =>
         throw new Exception(s"Invalid transition $transition")
     }
@@ -582,9 +609,6 @@ object TriN {
     // right 90-degree range that includes the given geoX
     val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, geoX))) / 90.0) - 180.0
 
-    //TODO remove
-    println(s"geoToOctX($geoX, $y):  geoX0 $geoX0")
-
     // given the range minimum, transform the geo-X into an oct-X
     val pY = (90.0 - Math.abs(y)) / 90.0
     val xMid = geoX0 + 45.0
@@ -596,9 +620,6 @@ object TriN {
     // the octahedral faces are all 90 degrees wide, so you just need to pick the
     // right 90-degree range that includes the given geoX
     val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, octX))) / 90.0) - 180.0
-
-    //TODO remove
-    println(s"octToGeoX($octX, $y):  geoX0 $geoX0")
 
     // given the range minimum, transform the geo-X into an oct-X
     val pY = (90.0 - Math.abs(y)) / 90.0
@@ -648,27 +669,28 @@ object TriN {
     })
   }
 
-  def iterator(depth: Int): Iterator[Triangle] = {
+  // uses the "next" function within the Triangle class itself
+  def iterator(depth: Int): Iterator[Triangle] = new Iterator[Triangle] {
     require(depth > 0, s"Depth ($depth) must be a positive integer")
-
-    val faces: Seq[Int] = (0 to 7).toSeq
-    val seqs: Seq[Seq[Int]] = (2 to depth).foldLeft(Seq(faces))((acc, _) => acc ++ Seq(Transitions.toSeq)).reverse
-
-    CartesianProductIterable(seqs).iterator.map( seq => {
-      val index = seq.reverse.foldLeft(0L)((acc, i) => i match {
-        case n: Int =>
-          (acc << 3) | n
-      })
-      val t = invIndex(index, depth)
-      require(t.index == index)
-      t
-    })
+    var triangle: Option[Triangle] = Option(createLowestIndex(depth))
+    def hasNext: Boolean = triangle.isDefined
+    def next(): Triangle = {
+      val result = triangle.orNull
+      triangle = triangle.get.next
+      result
+    }
   }
 
   def geoLineWkt(t0: Triangle, t1: Triangle): String =
     "LINESTRING(" +
       t0.bounds.geoXMid + " " + t0.bounds.yMid + ", " +
       t1.bounds.geoXMid + " " + t1.bounds.yMid +
+      ")"
+
+  def octLineWkt(t0: Triangle, t1: Triangle): String =
+    "LINESTRING(" +
+      t0.bounds.octXMid + " " + t0.bounds.yMid + ", " +
+      t1.bounds.octXMid + " " + t1.bounds.yMid +
       ")"
 }
 
@@ -806,20 +828,29 @@ object TriTest extends App {
     }
   }
 
+  // ensure that you can encode many different triangles, and that the geo/oct conversion works round-trip
   def testInitialTri(n: Int, geoX: Double, y: Double): Unit = {
     val octFace = getTriangle(geoX, y, 1)
     val bIndex = octFace.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
     val octX = geoToOctX(geoX, y)
     val x2 = octToGeoX(octX, y)
-    pw.println(f"$n%d\tPOINT($geoX%1.4f $y%1.4f)\tPOINT($octX%1.4f $y%1.4f)\t$bIndex%s")
+    //pw.println(f"$n%d\tPOINT($geoX%1.4f $y%1.4f)\tPOINT($octX%1.4f $y%1.4f)\t$bIndex%s")
     if (Math.abs(y) < 89.5) {
       require(Math.abs(x2 - geoX) <= 1e-6, f"Failed to satisfy XT inverse:  $geoX%1.6f <> $octX%1.6f")
     }
   }
+  val xs = (-180.0 to 179.999 by 22.5).zipWithIndex
+  val ys = (-90.0 to 89.999 by 11.25*0.5).zipWithIndex
+  val ny = ys.length
+  for (xx <- xs; yy <- ys) {
+    testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
+  }
 
+  // dump files out that we want to visualize
+  // (these are not unit tests so much as manual validation tests)
   try {
     pw = new PrintWriter(new FileWriter("test-points.txt"))
-    pw.println("name\torig_wkt\toct_wkt")
+    pw.println("name\tgeo_wkt\toct_wkt")
     LocationsByName.foreach {
       case (name, LatLon(y, geoX)) =>
         val t = getInitialTriangle(geoX, y)
@@ -828,56 +859,42 @@ object TriTest extends App {
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-triangles.txt"))
-    pw.println("index\twkt")
+    pw.println("index\toct_wkt\tgeo_wkt")
     for (row <- 0 to 1; col <- 0 to 3) {
       val x0 = -180.0 + 90.0 * col
       val y0 = -90.0 + 90.0 * row
       val x1 = x0 + 90.0 - 1e-6
       val y1 = y0 + 90.0 - 1e-6
       val xMid = 0.5 * (x0 + x1)
-      val yMid = 0.5 * (x0 + x1)
-      val index = getInitialTriangle(xMid, yMid).index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
-      if (row == 0) {
-        pw.println(s"$index\tPOLYGON(($x0 $y1, $xMid $y0, $x1 $y1, $x0 $y1))")
-      } else {
-        pw.println(s"$index\tPOLYGON(($x0 $y0, $xMid $y1, $x1 $y0, $x0 $y0))")
-      }
-    }
-    pw.close()
-
-    pw = new PrintWriter(new FileWriter("test.txt"))
-    pw.println("label\torig_wkt\ttri_wkt\tindex")
-    val xs = (-180.0 to 179.999 by 22.5).zipWithIndex
-    val ys = (-90.0 to 89.999 by 11.25*0.5).zipWithIndex
-    val ny = ys.length
-    for (xx <- xs; yy <- ys) {
-      testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
+      val yMid = 0.5 * (y0 + y1)
+      val t = getInitialTriangle(xMid, yMid)
+      pw.println(s"${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
     }
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-index.txt"))
-    pw.println("depth\tindex_dec\tindex_bits\twkt\tarea_deg2\tarea_m2")
+    pw.println("depth\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tarea_deg2\tarea_m2")
     val target: LatLon = LocationsByName("Eichelberger")
     (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target.longitude, target.latitude, depth)
-        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.bounds.geoWkt(t.orientation) + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
+        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
         (x, y)
     })
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-tiles.txt"))
-    pw.println("orientation\tindex_dec\tindex_bits\twkt")
-    for (t <- iterator(4)) {
-      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.bounds.geoWkt(t.orientation)}")
+    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt")
+    for (t <- iterator(2)) {
+      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
     }
     pw.close()
 
     pw = new PrintWriter(new FileWriter("test-progression.txt"))
-    pw.println("index_from\tindex_to\twkt")
+    pw.println("index_from\tindex_to\toct_wkt\tgeo_wkt")
     for (t <- iterator(4).sliding(2, 1)) t match {
       case Seq(t0, t1) =>
-        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}")
+        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}\t${octLineWkt(t0, t1)}")
     }
     pw.close()
 
