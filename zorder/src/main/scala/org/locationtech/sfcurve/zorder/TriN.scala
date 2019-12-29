@@ -229,7 +229,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   // recursing into the Apex starting from an oct face
   def isAllApex: Boolean = {
     if (depth == 1) return true
-    for (i <- depth - 1 to 0 by -1) {
+    for (i <- depth - 2 to 0 by -1) {
       val transition: Long = (index >> (3 * i)) & 3
       if (transition != TransApex) return false
     }
@@ -669,6 +669,14 @@ object TriN {
     })
   }
 
+  def invIndex(indexAsBinaryString: String): Triangle = {
+    require(indexAsBinaryString != null)
+    require(indexAsBinaryString.length % 3 == 0)
+    val depth = indexAsBinaryString.length / 3
+    val index = java.lang.Long.parseLong(indexAsBinaryString, 2)
+    invIndex(index, depth)
+  }
+
   // uses the "next" function within the Triangle class itself
   def iterator(depth: Int): Iterator[Triangle] = new Iterator[Triangle] {
     require(depth > 0, s"Depth ($depth) must be a positive integer")
@@ -844,6 +852,21 @@ object TriTest extends App {
   val ny = ys.length
   for (xx <- xs; yy <- ys) {
     testInitialTri(yy._2 * ny + xx._2, xx._1, yy._1)
+  }
+
+  // drive "isInitialApex"
+  for (oct <- 0 to 7) assert(invIndex(indexBinaryString(oct, 1)).isAllApex)
+  for (oct <- 0 to 7; trans0 <- Transitions) {
+    val t = invIndex(indexBinaryString(oct << 3 | trans0, 2)).isAllApex
+    assert((trans0 != TransApex) ^ t)
+  }
+  for (oct <- 0 to 7; trans0 <- Transitions; trans1 <- Transitions) {
+    val t = invIndex(indexBinaryString((oct << 3 | trans0) << 3 | trans1, 3)).isAllApex
+    assert((trans0 != TransApex || trans1 != TransApex) ^ t)
+  }
+  for (oct <- 0 to 7; trans0 <- Transitions; trans1 <- Transitions; trans2 <- Transitions) {
+    val t = invIndex(indexBinaryString(((oct << 3 | trans0) << 3 | trans1) << 3 | trans2, 4)).isAllApex
+    assert((trans0 != TransApex || trans1 != TransApex || trans2 != TransApex) ^ t)
   }
 
   // dump files out that we want to visualize
