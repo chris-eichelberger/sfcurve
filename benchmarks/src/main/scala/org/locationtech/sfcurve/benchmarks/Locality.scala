@@ -344,10 +344,7 @@ object Locality extends App {
   {
     println(s"\nMore triangle unit tests...")
 
-//    val idx = t2.toIndex(-78.495150, 38.075776)
-//    println(s"  Index CCRi:  $idx")
-//    val t = t2.toPoint(idx)
-    val depth = 4
+    val depth = 21
     val idx = TriN.index(-78.495150, 38.075776, depth)
     println(s"  Index CCRi:  $idx decimal, ${TriN.indexOctalString(idx, depth)}")
     val t = TriN.invIndex(idx, depth)
@@ -355,23 +352,12 @@ object Locality extends App {
 
     println(s"  From index:  $t")
     println(s"    centroid:  $point")
-    System.exit(-1)
+
+    assert(Math.abs(point._1 - -78.495150) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
+    assert(Math.abs(point._2 - 38.075776) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
+
+    //System.exit(-1)
   }
-
-  // application
-  // =CORREL($C$2:$C$100001,D$2:D$100001)
-  // Z2	H2	tri
-  //0.716675856	0.250055058	0.743290119
-  //0.714665639	0.240273265	0.741659422
-  //0.712142341	0.242960041	0.740031498
-  //0.719532321	0.247919821	0.745290572
-  //0.713298924	0.237534539	0.740847436
-  //0.714175341	0.242465329	0.741506736
-  //0.715370096	0.248664902	0.742935838
-  //0.717145868	0.242575736	0.743071597
-  //0.715021582	0.239930681	0.741891317
-  //0.715148242	0.238397849	0.740885343
-
 
   println("\nRunning...")
 

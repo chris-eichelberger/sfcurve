@@ -67,10 +67,21 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
   // this does allow for error; consider the case where a (proper, geo) rectangle
   // has a lower-right corner that is almost (but not) touching the left ascent of
   // this trapezoid:  this routine will falsely claim that the shapes everlap
+  // assumes GEOGRAPHIC coordinates
   def geoOverlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
     // coarse definition
     if (geoX0 > xmax) return false
     if (geoX1 < xmin) return false
+    if (y0 > ymax) return false
+    if (y1 < ymin) return false
+    true
+  }
+
+  // assumes OCTAHEDRAL coordinates
+  def octOverlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
+    // coarse definition
+    if (octX0 > xmax) return false
+    if (octX1 < xmin) return false
     if (y0 > ymax) return false
     if (y1 < ymin) return false
     true
@@ -159,8 +170,8 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
 
   // called by TriN and itself
-  // assumes that you are given GEOGRAPHIC coordinates!
-  def getRangesRecursively(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
+  // assumes that you are given OCTAHEDRAL coordinates!
+  def getRangesRecursively(octXMin: Double, ymin: Double, octXMax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
     // check stop conditions
     if (depth == maxDepth) {
       // if you've gotten here, then your (single) index is the only thing to return
@@ -169,26 +180,26 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     if (depth > maxDepth) throw new Exception("Should not be able to recurse this far")
 
     // find your children that intersect the query area
-    val subs = childTriangles.filter(_.bounds.geoOverlaps(xmin, ymin, xmax, ymax))
+    val subs = childTriangles.filter(_.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
     if (subs.isEmpty) {
       throw new Exception(s"Parent overlaps geo bounds, but no child does")
       //return Seq[IndexRange]()
     }
 
     // recurse, and combine the results
-    subs.tail.foldLeft(subs.head.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth))((acc, t) => {
-      t.consolidateRanges((acc ++ t.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth)).iterator).toSeq
+    subs.tail.foldLeft(subs.head.getRangesRecursively(octXMin, ymin, octXMax, ymax, maxDepth))((acc, t) => {
+      t.consolidateRanges((acc ++ t.getRangesRecursively(octXMin, ymin, octXMax, ymax, maxDepth)).iterator).toSeq
     })
   }
 
   // degenerate for the Curve contract
   // assumes that you are given GEOGRAPHIC coordinates!
-  override def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
-    require(xmin <= xmax)
+  override def toRanges(geoXMin: Double, ymin: Double, geoXMax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    require(geoXMin <= geoXMax)
     require(ymin <= ymax)
 
     // defer to the companion object to do this planning top-down
-    TriN.getRanges(xmin, ymin, xmax, ymax, depth)
+    TriN.getRanges(geoXMin, ymin, geoXMax, ymax, depth)
   }
 
   def fold(subordinates: Seq[Long]): Long = throw new Exception("DO NOT CALL Triangle.fold")
@@ -584,14 +595,18 @@ object TriN {
   val OctahedronFaces: Vector[Triangle] = (0 to 7).map(face => invIndex(face, 1)).toVector
 
   // assume these are GEOGRAPHIC X-coordinates, /not/ octahedral X-coordinates
-  def getRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
+  def getRanges(geoXMin: Double, ymin: Double, geoXMax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
+    // translate the geo coordinates to octahedral coordinates
+    val octXMin = Math.min(geoToOctX(ymin)(geoXMin), geoToOctX(ymax)(geoXMin))
+    val octXMax = Math.max(geoToOctX(ymin)(geoXMax), geoToOctX(ymax)(geoXMax))
+
     // find the top-level octahedron faces that intersect the query region at all
-    val faces: Vector[Triangle] = OctahedronFaces.filter(t => t.bounds.geoOverlaps(xmin, ymin, xmax, ymax))
+    val faces: Vector[Triangle] = OctahedronFaces.filter(t => t.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
     if (faces.isEmpty) throw new Exception("Triangle query did not match any octahedral faces!")
 
     // recurse, and combine results
-    faces.tail.foldLeft(faces.head.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth))((acc, face) => {
-      val faceRanges: Seq[IndexRange] = face.getRangesRecursively(xmin, ymin, xmax, ymax, maxDepth)
+    faces.tail.foldLeft(faces.head.getRangesRecursively(octXMin, ymin, octXMax, ymax, maxDepth))((acc, face) => {
+      val faceRanges: Seq[IndexRange] = face.getRangesRecursively(octXMin, ymin, octXMax, ymax, maxDepth)
       face.consolidateRanges((acc ++ faceRanges).iterator).toSeq
     })
   }
