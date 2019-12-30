@@ -99,10 +99,10 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
   def octWkt(orientation: Int): String = orientation match {
     case A_BC | A_CB | B_AC | B_CA | C_AB | C_BA =>
       // apex on top
-      s"POLYGON((${octXMid} ${Y.max}, ${octX1} ${Y.min}, ${octX0} ${Y.min}, ${octXMid} ${Y.max}))"
+      s"POLYGON(($octXApex ${Y.max}, ${octXBase.max} ${Y.min}, ${octXBase.min} ${Y.min}, $octXApex ${Y.max}))"
     case AB_C | AC_B | BA_C | BC_A | CA_B | CB_A =>
       // apex on bottom
-      s"POLYGON((${octX0} ${Y.max}, ${octX1} ${Y.max}, ${octXMid} ${Y.min}, ${octX0} ${Y.max}))"
+      s"POLYGON((${octXBase.min} ${Y.max}, ${octXBase.max} ${Y.max}, $octXApex ${Y.min}, ${octXBase.min} ${Y.max}))"
     case _ =>
       throw new Exception(s"Invalid orientation $orientation")
   }
@@ -121,10 +121,10 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
 
 /**
   *
-  * @param index
-  * @param orientation
-  * @param bounds:  the geographic and octahedral bounds of this triangle
-  * @param depth
+  * @param index the whole number uniquely representing this triangle-cell index
+  * @param orientation which Gray-encoding orientation to use for this cell
+  * @param bounds the geographic and octahedral bounds of this triangle
+  * @param depth how many levels deep this cell is embedded
   */
 case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int) extends SpaceFillingCurve2D(depth * 3) with InMemoryRangeConsolidator {
   implicit def octX0: Double = bounds.octX0
