@@ -112,6 +112,26 @@ case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: E
     case _ =>
       throw new Exception(s"Invalid orientation $orientation")
   }
+
+  def octFromGeoWkt(orientation: Int): String = {
+    val (ay: Double, by: Double) = if (isApexUp(orientation)) (Y.max, Y.min) else (Y.min, Y.max)
+    val bx0 = geoToOctX(geoXBase.min, by)
+    val bx1 = geoToOctX(geoXBase.max, by)
+    val ax0 = geoToOctX(geoXApex.min, ay)
+    val ax1 = geoToOctX(geoXApex.max, ay)
+    s"POLYGON(($ax0 $ay, $ax1 $ay, $bx1 $by, $bx0 $by, $ax0 $ay))"
+  }
+
+  def geoFromOctWkt(orientation: Int): String = {
+    val (ay: Double, by: Double) = if (isApexUp(orientation)) (Y.max, Y.min) else (Y.min, Y.max)
+    val bx0 = octToGeoX(octX0, by)
+    val bx1 = geoToOctX(octX1, by)
+    val (ax0, ax1) = if (Math.abs(ay) < 90.0) (
+      geoToOctX(octXMid, ay),
+      geoToOctX(octXMid, ay)
+    ) else (bx0, bx1)
+    s"POLYGON(($ax0 $ay, $ax1 $ay, $bx1 $by, $bx0 $by, $ax0 $ay))"
+  }
 }
 
 /**
@@ -610,13 +630,19 @@ object TriN {
 
   def geoToOctX(geoX: Double, y: Double): Double = {
     // the octahedral faces are all 90 degrees wide, so you just need to pick the
-    // right 90-degree range that includes the given geoX
+    // right 90-degree range that includes the given [geoX, geoX)
     val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, geoX))) / 90.0) - 180.0
 
-    // given the range minimum, transform the geo-X into an oct-X
-    val pY = (90.0 - Math.abs(y)) / 90.0
+    // do stuff
+    val alpha = Math.abs(y) / 90.0
     val xMid = geoX0 + 45.0
-    val octX = xMid - pY * (xMid - geoX)
+    val octX = alpha * xMid + (1.0 - alpha) * geoX
+
+//    // given the range minimum, transform the geo-X into an oct-X
+//    val pY = (90.0 - Math.abs(y)) / 90.0
+//    val xMid = geoX0 + 45.0
+//    val octX = xMid - pY * (xMid - geoX)
+
     octX
   }
 
@@ -625,12 +651,18 @@ object TriN {
     // right 90-degree range that includes the given geoX
     val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, octX))) / 90.0) - 180.0
 
-    // given the range minimum, transform the geo-X into an oct-X
-    val pY = (90.0 - Math.abs(y)) / 90.0
-    // mind the potential division-by-zero
-    if (pY < 1e-6) return octX
+    // do stuff
+    val alpha = Math.abs(y) / 90.0
     val xMid = geoX0 + 45.0
-    val geoX = xMid - (xMid - octX) / pY
+    val geoX = if (alpha < 1.0) (octX - alpha * xMid) / (1.0 - alpha) else geoX0
+
+//    // given the range minimum, transform the geo-X into an oct-X
+//    val pY = (90.0 - Math.abs(y)) / 90.0
+//    // mind the potential division-by-zero
+//    if (pY < 1e-6) return octX
+//    val xMid = geoX0 + 45.0
+//    val geoX = xMid - (xMid - octX) / pY
+
     geoX
   }
 
@@ -832,6 +864,14 @@ object TriTest extends App {
   assert(BA_C == CCW(CW(BA_C)), s"Uninvertible:  BA_C <> CCW(CW(BA_C))")
   assert(CB_A == CCW(CW(CB_A)), s"Uninvertible:  CB_A <> CCW(CW(CB_A))")
 
+  // test the geo-to-oct conversion both ways
+  for (geoX <- -90.0 to -1e-4 by Math.PI; y <- 0.0 to 90.0 - 1e-4 by Math.PI) {
+    val octX = geoToOctX(geoX, y)
+    val geoX2 = octToGeoX(octX, y)
+    //println(s"Y $y:  geoX $geoX -> octX $octX -> geoX $geoX2:  difference is ${Math.abs(geoX - geoX2)}")
+    assert(Math.abs(geoX - geoX2) <= 1e-10, s"Y $y for geoX $geoX -> octX $octX -> geoX $geoX2:  difference is ${Math.abs(geoX - geoX2)}")
+  }
+
   // index and inverse-index must be -- wait for it... -- inverses
   for (depth <- 1 to 21; loc <- LocationsByName) {
     loc match {
@@ -930,7 +970,16 @@ object TriTest extends App {
     pw.close()
 
     // validate the 2D geo/oct coordinate translation
-
+    pw = new PrintWriter(new FileWriter("test-oct2geo.txt"))
+    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt\tgeo2oct_wkt")
+    val target2: LatLon = LocationsByName("Eichelberger")
+    (1 to 4).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
+      case (x, y) =>
+        val t = getTriangle(target2.longitude, target2.latitude, depth)
+        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.geoFromOctWkt(t.orientation))
+        (x, y)
+    })
+    pw.close()
 
   } finally {
     pw.close()
