@@ -32,19 +32,24 @@ import TriN._
 
 // although this will often have a degenerate Apex Geo X (when the shape is a proper triangle),
 // it can also describe a real rectangle (as for an octahedron face) as well as a trapezoid
-case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: Extent[Double], Y: Extent[Double]) {
-  val octX0: Double = octX.min
-  val octX1: Double = octX.max
-  val octXMid: Double = octX.q2
-  val octX14: Double = octX.q1
-  val octX34: Double = octX.q3
+case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Double], isApexUp: Boolean) {
+  val octX0: Double = octXBase.min
+  val octX1: Double = octXBase.max
+  val octXMid: Double = octXBase.q2
+  val octX14: Double = octXBase.q1
+  val octX34: Double = octXBase.q3
 
-  val geoX: Extent[Double] = Extent(Math.min(geoXApex.min, geoXBase.min), Math.max(geoXApex.max, geoXBase.max))
-  val geoX0: Double = geoX.min
-  val geoX1: Double = geoX.max
-  val geoXMid: Double = geoX.q2
-  val geoX14: Double = geoX.q1
-  val geoX34: Double = geoX.q3
+  val (yApex: Double, yBase: Double) = if (isApexUp) (Y.max, Y.min) else (Y.min, Y.max)
+
+  // TODO fix this so that it doesn't return two copies of the same point at the singularity
+  val geoXApex: Extent[Double] = Extent(TriN.octToGeoX(yApex)(octXApex - ApexBias), TriN.octToGeoX(yApex)(octXApex + ApexBias))
+  val geoXBase: Extent[Double] = octXBase.apply(TriN.octToGeoX(yBase))
+
+  val geoX0: Double = geoXBase.min
+  val geoX1: Double = geoXBase.max
+  val geoXMid: Double = geoXBase.q2
+  val geoX14: Double = geoXBase.q1
+  val geoX34: Double = geoXBase.q3
 
   val y0: Double = Y.min
   val y1: Double = Y.max
@@ -111,26 +116,6 @@ case class TriBounds(geoXApex: Extent[Double], geoXBase: Extent[Double], octX: E
       s"POLYGON((${geoXBase.min} ${Y.max}, ${geoXBase.max} ${Y.max}, ${geoXApex.max} ${Y.min}, ${geoXApex.min} ${Y.min}, ${geoXBase.min} ${Y.max}))"
     case _ =>
       throw new Exception(s"Invalid orientation $orientation")
-  }
-
-  def octFromGeoWkt(orientation: Int): String = {
-    val (ay: Double, by: Double) = if (isApexUp(orientation)) (Y.max, Y.min) else (Y.min, Y.max)
-    val bx0 = geoToOctX(geoXBase.min, by)
-    val bx1 = geoToOctX(geoXBase.max, by)
-    val ax0 = geoToOctX(geoXApex.min, ay)
-    val ax1 = geoToOctX(geoXApex.max, ay)
-    s"POLYGON(($ax0 $ay, $ax1 $ay, $bx1 $by, $bx0 $by, $ax0 $ay))"
-  }
-
-  def geoFromOctWkt(orientation: Int): String = {
-    val (ay: Double, by: Double) = if (isApexUp(orientation)) (Y.max, Y.min) else (Y.min, Y.max)
-    val bx0 = octToGeoX(octX0, by)
-    val bx1 = geoToOctX(octX1, by)
-    val (ax0, ax1) = if (Math.abs(ay) < 90.0) (
-      geoToOctX(octXMid, ay),
-      geoToOctX(octXMid, ay)
-    ) else (bx0, bx1)
-    s"POLYGON(($ax0 $ay, $ax1 $ay, $bx1 $by, $bx0 $by, $ax0 $ay))"
   }
 }
 
@@ -274,28 +259,22 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
       case _ => throw new Exception("Invalid transition $transition")
     })
 
+    val nextIsApexUp = isApexUp(nextOrientation(transition))
+
     //TODO figure out how to handle apex/base switching at the poles!
     val childBounds = transition match {
       case TransCenter =>
         //Extent(octX14, octX34), makeExtent(y0, yMid)
-        if (isAllApex) {
-          TriBounds(bounds.geoXBase.peq2, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
-        } else {
-          TriBounds(bounds.geoXBase.peq2, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(y0, yMid))
-        }
+        TriBounds(bounds.octXBase.q2, bounds.octXBase.subH1, TriN.makeExtent(y0, yMid), nextIsApexUp)
       case TransApex =>
         //Extent(octX14, octX34), makeExtent(yMid, y1)
-        if (isAllApex) {
-          TriBounds(bounds.geoXApex, bounds.geoXBase, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
-        } else {
-          TriBounds(bounds.geoXApex.peq2, bounds.geoXAtMidY, bounds.octX.subH1, TriN.makeExtent(yMid, y1))
-        }
+        TriBounds(bounds.octXBase.q2, bounds.octXBase.subH1, TriN.makeExtent(yMid, y1), nextIsApexUp)
       case TransLL =>
         //Extent(octX0, octXMid), makeExtent(y0, yMid)
-        TriBounds(bounds.geoXAtMidY.peq0, bounds.geoXBase.subH0, bounds.octX.subH0, TriN.makeExtent(y0, yMid))
+        TriBounds(bounds.octXBase.q1, bounds.octXBase.subH0, TriN.makeExtent(y0, yMid), nextIsApexUp)
       case TransLR =>
         //Extent(octXMid, octX1), makeExtent(y0, yMid)
-        TriBounds(bounds.geoXAtMidY.peq4, bounds.geoXBase.subH2, bounds.octX.subH2, TriN.makeExtent(y0, yMid))
+        TriBounds(bounds.octXBase.q3, bounds.octXBase.subH2, TriN.makeExtent(y0, yMid), nextIsApexUp)
       case _ =>
         throw new Exception(s"Invalid transition $transition")
     }
@@ -355,6 +334,8 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
 }
 
 object TriN {
+  val ApexBias: Double = 1e-14
+
   // PMLP for working with Extent[Double] ranges for geo-, oct-coordinates
   implicit class RichExtent(extent: Extent[Double]) {
     def span: Double = extent.max - extent.min
@@ -379,6 +360,8 @@ object TriN {
     def peq2: Extent[Double] = Extent(q2, q2)
     def peq3: Extent[Double] = Extent(q3, q3)
     def peq4: Extent[Double] = Extent(q4, q4)
+
+    def apply(functor: Double => Double): Extent[Double] = Extent(functor(extent.min), functor(extent.max))
   }
 
   val TriTopLongitude: Longitude = Longitude(4)
@@ -624,11 +607,11 @@ object TriN {
     val x0: Double = -180.0 + 90.0 * ix
     val y0: Double = -90.0 + 90.0 * iy
     // the octahedral face is a weird case where the APEX bounds are also 90 degrees wide!
-    val bounds: TriBounds = TriBounds(Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0))
+    val bounds: TriBounds = TriBounds(x0 + 45.0, Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), isApexUp(orientation))
     Triangle(idx, orientation, bounds, 1)
   }
 
-  def geoToOctX(geoX: Double, y: Double): Double = {
+  def geoToOctX(y: Double)(geoX: Double): Double = {
     // the octahedral faces are all 90 degrees wide, so you just need to pick the
     // right 90-degree range that includes the given [geoX, geoX)
     val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, geoX))) / 90.0) - 180.0
@@ -646,7 +629,7 @@ object TriN {
     octX
   }
 
-  def octToGeoX(octX: Double, y: Double): Double = {
+  def octToGeoX(y: Double)(octX: Double): Double = {
     // the octahedral faces are all 90 degrees wide, so you just need to pick the
     // right 90-degree range that includes the given geoX
     val geoX0: Double = 90.0 * Math.floor((180.0 + Math.max(-180.0, Math.min(179.999999, octX))) / 90.0) - 180.0
@@ -654,7 +637,13 @@ object TriN {
     // do stuff
     val alpha = Math.abs(y) / 90.0
     val xMid = geoX0 + 45.0
-    val geoX = if (alpha < 1.0) (octX - alpha * xMid) / (1.0 - alpha) else geoX0
+    val geoX = if (alpha < 1.0) {
+      (octX - alpha * xMid) / (1.0 - alpha)
+    } else {
+      // at the discontinuity, you have to go all the way to the extreme, so pick the
+      // side that you favor (if any)
+      if (octX <= xMid) geoX0 else geoX0 + 90.0
+    }
 
 //    // given the range minimum, transform the geo-X into an oct-X
 //    val pY = (90.0 - Math.abs(y)) / 90.0
@@ -671,7 +660,7 @@ object TriN {
     require(maxDepth > 0, s"maxDepth must be at least one; found $maxDepth")
     val octFace = getInitialTriangle(geoX, y)
     if (maxDepth > 1) {
-      val result = octFace.getTriangle(geoToOctX(geoX, y), y, maxDepth - 1)
+      val result = octFace.getTriangle(geoToOctX(y)(geoX), y, maxDepth - 1)
       result
     } else {
       val result = octFace
@@ -700,8 +689,9 @@ object TriN {
     val octYi = (octIdx >> 2) & 1
     val x0 = octXi * 90.0 - 180.0
     val y0 = octYi * 90.0 - 90.0
-    val bounds: TriBounds = TriBounds(Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0))
-    val octFace: Triangle = Triangle(octIdx, topOrientation(octXi.toInt, octYi.toInt), bounds, 1)
+    val faceOrientation = topOrientation(octXi.toInt, octYi.toInt)
+    val bounds: TriBounds = TriBounds(x0 + 45.0, Extent(x0, x0 + 90.0), Extent(y0, y0 + 90.0), isApexUp(faceOrientation))
+    val octFace: Triangle = Triangle(octIdx, faceOrientation, bounds, 1)
 
     (depth - 2  to 0 by -1).foldLeft(octFace)((acc, i) => {
       val corner = (idx >> (3 * i)) & 7
@@ -866,8 +856,8 @@ object TriTest extends App {
 
   // test the geo-to-oct conversion both ways
   for (geoX <- -90.0 to -1e-4 by Math.PI; y <- 0.0 to 90.0 - 1e-4 by Math.PI) {
-    val octX = geoToOctX(geoX, y)
-    val geoX2 = octToGeoX(octX, y)
+    val octX = geoToOctX(y)(geoX)
+    val geoX2 = octToGeoX(y)(octX)
     //println(s"Y $y:  geoX $geoX -> octX $octX -> geoX $geoX2:  difference is ${Math.abs(geoX - geoX2)}")
     assert(Math.abs(geoX - geoX2) <= 1e-10, s"Y $y for geoX $geoX -> octX $octX -> geoX $geoX2:  difference is ${Math.abs(geoX - geoX2)}")
   }
@@ -888,8 +878,8 @@ object TriTest extends App {
   def testInitialTri(n: Int, geoX: Double, y: Double): Unit = {
     val octFace = getTriangle(geoX, y, 1)
     val bIndex = octFace.index.toBinaryString.reverse.padTo(3, "0").reverse.mkString("")
-    val octX = geoToOctX(geoX, y)
-    val x2 = octToGeoX(octX, y)
+    val octX = geoToOctX(y)(geoX)
+    val x2 = octToGeoX(y)(octX)
     //pw.println(f"$n%d\tPOINT($geoX%1.4f $y%1.4f)\tPOINT($octX%1.4f $y%1.4f)\t$bIndex%s")
     if (Math.abs(y) < 89.5) {
       require(Math.abs(x2 - geoX) <= 1e-6, f"Failed to satisfy XT inverse:  $geoX%1.6f <> $octX%1.6f")
@@ -925,7 +915,7 @@ object TriTest extends App {
     LocationsByName.foreach {
       case (name, LatLon(y, geoX)) =>
         val t = getInitialTriangle(geoX, y)
-        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(geoX, y)} $y)")
+        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(y)(geoX)} $y)")
     }
     pw.close()
 
@@ -971,12 +961,12 @@ object TriTest extends App {
 
     // validate the 2D geo/oct coordinate translation
     pw = new PrintWriter(new FileWriter("test-oct2geo.txt"))
-    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt\tgeo2oct_wkt")
+    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt")
     val target2: LatLon = LocationsByName("Eichelberger")
-    (1 to 4).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
+    (1 to 3).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
       case (x, y) =>
         val t = getTriangle(target2.longitude, target2.latitude, depth)
-        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.geoFromOctWkt(t.orientation))
+        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt)
         (x, y)
     })
     pw.close()
