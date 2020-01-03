@@ -30,6 +30,8 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 import TriN._
 
+case class Rectangle(x: Extent[Double], y: Extent[Double])
+
 // although this will often have a degenerate Apex Geo X (when the shape is a proper triangle),
 // it can also describe a real rectangle (as for an octahedron face) as well as a trapezoid
 case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Double], isApexUp: Boolean) {
@@ -64,33 +66,35 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     0.5 * (geoXApex.max + geoXBase.max)
   )
 
-  // this does allow for error; consider the case where a (proper, geo) rectangle
-  // has a lower-right corner that is almost (but not) touching the left ascent of
-  // this trapezoid:  this routine will falsely claim that the shapes everlap
-  // assumes GEOGRAPHIC coordinates
-  def geoOverlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
-    // coarse definition
-    if (geoX0 > xmax) return false
-    if (geoX1 < xmin) return false
-    if (y0 > ymax) return false
-    if (y1 < ymin) return false
-    true
+  def octOverlaps(rectangle: Rectangle): Boolean = {
+    // simple vertical elimination
+    if (rectangle.y.max < Y.min) return false
+    if (rectangle.y.min > Y.max) return false
+
+    // simple horizontal elimination
+    if (rectangle.x.max < octXBase.min) return false
+    if (rectangle.x.min > octXBase.max) return false
+
+    //MPos || MPosInv
+    //MNeg || MNegInv
+
+    // shoulder cases, both left and right
+    val yProbe = min(Y.max, rectangle.y.max, max(rectangle.y.min, Y.min))
+    val invSlope: Double = if (rectangle.x.max <= octXBase.q2 ^ isApexUp) MNegInv else MPosInv
+    val b: Double = if (isApexUp) Y.min else Y.max
+    val x0: Double = if (rectangle.x.max <= octXBase.q2) octXBase.min else octXBase.max
+    val xProbe: Double = (yProbe - b) * invSlope + x0
+
+    // TODO:  remove after debugging
+    println(s"    TriBounds.overlaps($rectangle):  yProbe $yProbe, invSlope $invSlope, xProbe $xProbe, b $b, result ${rectangle.x.contains(xProbe)}")
+
+    rectangle.x.contains(xProbe)
   }
 
   // assumes OCTAHEDRAL coordinates
   def octOverlaps(xmin: Double, ymin: Double, xmax: Double, ymax: Double): Boolean = {
-    // coarse definition
-    if (octX0 > xmax) return false
-    if (octX1 < xmin) return false
-    if (y0 > ymax) return false
-    if (y1 < ymin) return false
-    true
+    octOverlaps(Rectangle(Extent(xmin, xmax), Extent(ymin, ymax)))
   }
-
-  def containsGeoPoint(x: Double, y: Double): Boolean =
-    geoOverlaps(x, y, x, y)
-
-  def containsGeoX(x: Double): Boolean = x >= geoX0 && x <= geoX1
 
   def containsOctX(x: Double): Boolean = x >= octX0 && x <= octX1
 
@@ -346,6 +350,9 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
 
 object TriN {
   val ApexBias: Double = 1e-14
+
+  def min(x: Double*): Double = x.min
+  def max(x: Double*): Double = x.max
 
   // PMLP for working with Extent[Double] ranges for geo-, oct-coordinates
   implicit class RichExtent(extent: Extent[Double]) {
@@ -920,6 +927,29 @@ object TriTest extends App {
   for (oct <- 0 to 7; trans0 <- Transitions; trans1 <- Transitions; trans2 <- Transitions) {
     val t = invIndex(indexBinaryString(((oct << 3 | trans0) << 3 | trans1) << 3 | trans2, 4)).isAllApex
     assert((trans0 != TransApex || trans1 != TransApex || trans2 != TransApex) ^ t)
+  }
+
+  // test the "triangle overlaps (oct) rectangle" functions
+  {
+    val target: LatLon = LocationsByName("Eichelberger")
+    val t: Triangle = TriN.getTriangle(target.longitude, target.latitude, 4)
+    def testOverlap(x: Double, y: Double, expectation: Boolean): Unit = {
+      val r = Rectangle(Extent(x, x, incMin = true, incMax = true), Extent(y, y, incMin = true, incMax = true))
+      println(s"  test point $r, expects $expectation")
+      assert(t.bounds.octOverlaps(r) == expectation, "Triangle.bounds.octOverlaps(Rectangle) did not meet expectations.")
+    }
+    println(s"Test triangle:  $t")
+    // obviously wrong
+    testOverlap(-1.0, -1.0, expectation = false)
+    testOverlap(-1.0, 1.0, expectation = false)
+    testOverlap(1.0, -1.0, expectation = false)
+    testOverlap(1.0, 1.0, expectation = false)
+    // less obviously wrong
+    testOverlap(-65.0, 44.9, expectation = false)
+    // obviously right
+    testOverlap(-67.5, 40.0, expectation = true)
+    // less obviously right
+    System.exit(-1)
   }
 
   // dump files out that we want to visualize
