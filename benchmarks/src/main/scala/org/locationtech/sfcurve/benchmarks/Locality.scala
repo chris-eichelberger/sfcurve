@@ -386,10 +386,17 @@ object Locality extends App {
   val cville = Seq(FixedSample(CharlottesvillePoints))
 
   val debugQueries = Seq(FixedSample(Seq(
+    /*
     Points(
-      //POINT(68.62082281207503 39.77771938277874), POINT(69.62082281207503 40.77771938277874)
       Point(Degrees(68.62082281207503), Degrees(39.77771938277874)),
       Point(Degrees(69.62082281207503), Degrees(40.77771938277874))
+    ),
+     */
+    Points(
+      //POINT(178.0929491294956 -75.64062932319783), POINT(179.0929491294956 -74.64062932319783)
+      //TriBounds.overlaps(R(X 141.875, 142.525 Y -75.641, -74.641), T(X 90.000, 180.000 Y -90.000 0.000 apex 135.000, up false):  yProbe -75.641, 2.000 * (142.525 - 180.000) + 0.000 = -74.950, inside false
+      Point(Degrees(178.0929491294956), Degrees(-75.64062932319783)),
+      Point(Degrees(179.0929491294956), Degrees(-74.64062932319783))
     )
   )))
 
