@@ -80,15 +80,17 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
 
     // shoulder cases, both left and right
     val yProbe = min(Y.max, rectangle.y.max, max(rectangle.y.min, Y.min))
-    val invSlope: Double = if (rectangle.x.max <= octXBase.q2 ^ isApexUp) MNegInv else MPosInv
+    val slope: Double = if (rectangle.x.max <= octXBase.q2 ^ isApexUp) MNeg else MPos
     val b: Double = if (isApexUp) Y.min else Y.max
     val x0: Double = if (rectangle.x.max <= octXBase.q2) octXBase.min else octXBase.max
-    val xProbe: Double = (yProbe - b) * invSlope + x0
+    val xProbe: Double = min(octXBase.max, rectangle.x.max)
+    val yEq = slope * (xProbe - x0) + b
+    val inside = yProbe <= yEq
 
     // TODO:  remove after debugging
-    println(s"    TriBounds.overlaps($rectangle):  yProbe $yProbe, invSlope $invSlope, xProbe $xProbe, b $b, result ${rectangle.x.contains(xProbe)}")
+    println(s"    TriBounds.overlaps($rectangle):  yProbe $yProbe, $slope * ($xProbe - $x0) + $b = $yEq, inside $inside")
 
-    rectangle.x.contains(xProbe)
+    inside
   }
 
   // assumes OCTAHEDRAL coordinates
@@ -946,10 +948,13 @@ object TriTest extends App {
     testOverlap(1.0, 1.0, expectation = false)
     // less obviously wrong
     testOverlap(-65.0, 44.9, expectation = false)
+    testOverlap(-73.0, 44.0, expectation = false)
     // obviously right
     testOverlap(-67.5, 40.0, expectation = true)
+    testOverlap(-68.0, 40.0, expectation = true)
     // less obviously right
-    System.exit(-1)
+    testOverlap(-62.0, 34.0, expectation = true)
+    testOverlap(-73.0, 34.0, expectation = true)
   }
 
   // dump files out that we want to visualize
