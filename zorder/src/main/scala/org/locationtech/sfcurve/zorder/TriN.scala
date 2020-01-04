@@ -67,13 +67,32 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
   )
 
   def octOverlaps(rectangle: Rectangle): Boolean = {
+    // TODO:  remove after debugging
+    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
+    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
+
     // simple vertical elimination
-    if (rectangle.y.max < Y.min) return false
-    if (rectangle.y.min > Y.max) return false
+    if (rectangle.y.max < Y.min) {
+      // TODO:  remove after debugging
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
+      return false
+    }
+    if (rectangle.y.min > Y.max) {
+      // TODO:  remove after debugging
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
+      return false
+    }
 
     // simple horizontal elimination
-    if (rectangle.x.max < octXBase.min) return false
-    if (rectangle.x.min > octXBase.max) return false
+    if (rectangle.x.max < octXBase.min) {
+      // TODO:  remove after debugging
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
+      return false
+    }
+    if (rectangle.x.min > octXBase.max) {
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
+      return false
+    }
 
     //MPos || MPosInv
     //MNeg || MNegInv
@@ -85,10 +104,10 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val x0: Double = if (rectangle.x.max <= octXBase.q2) octXBase.min else octXBase.max
     val xProbe: Double = min(octXBase.max, rectangle.x.max)
     val yEq = slope * (xProbe - x0) + b
-    val inside = yProbe <= yEq
+    val inside = if (isApexUp) yProbe <= yEq else yProbe >= yEq
 
     // TODO:  remove after debugging
-    println(s"    TriBounds.overlaps($rectangle):  yProbe $yProbe, $slope * ($xProbe - $x0) + $b = $yEq, inside $inside")
+    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f, $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
 
     inside
   }
@@ -178,6 +197,9 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   // called by TriN and itself
   // assumes that you are given OCTAHEDRAL coordinates!
   def getRangesRecursively(octXMin: Double, ymin: Double, octXMax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
+    // TODO remove after debugging
+    println(f"  getRangesRecursively... ($octXMin%1.3f, $ymin%1.3f, $octXMax%1.3f, $ymax%1.3f, $maxDepth%1d)")
+
     // check stop conditions
     if (depth == maxDepth) {
       // if you've gotten here, then your (single) index is the only thing to return
@@ -188,7 +210,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
     if (subs.isEmpty) {
-      throw new Exception(s"Parent overlaps geo bounds, but no child does")
+      throw new Exception(s"Parent overlaps geo bounds, but no child (of ${childTriangles.size}) does")
       //return Seq[IndexRange]()
     }
 
