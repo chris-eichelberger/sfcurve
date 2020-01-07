@@ -67,7 +67,7 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
   )
 
   def octContained(octXMin: Double, ymin: Double, octXMax: Double, ymax: Double): Boolean = {
-    octXMin >= octXBase.min && octXMax <= octXBase.max && ymin >= Y.min && ymax <= Y.max
+    octXMin <= octXBase.min && octXMax >= octXBase.max && ymin <= Y.min && ymax >= Y.max
   }
 
   def octOverlaps(rectangle: Rectangle): Boolean = {

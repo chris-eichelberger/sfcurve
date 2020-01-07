@@ -434,7 +434,6 @@ object Locality extends App {
   val samplers: Seq[Sampler] = queries
 
   for (sampler <- samplers) {
-    //Table(sampler, verbose = false, z2, h2, t2, t33, t36).exhaust(ps)
     Table(sampler, verbose = false, z2, h2, t2, t33, t36).exhaust(ps)
   }
 
