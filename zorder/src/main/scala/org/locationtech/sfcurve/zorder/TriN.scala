@@ -99,15 +99,33 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
 
     // shoulder cases, both left and right
     val yProbe = min(Y.max, rectangle.y.max, max(rectangle.y.min, Y.min))
+    require(yProbe >= Y.min && yProbe <= Y.max)
     val slope: Double = if (rectangle.x.max <= octXBase.q2 ^ isApexUp) MNeg else MPos
     val b: Double = if (isApexUp) Y.min else Y.max
     val x0: Double = if (rectangle.x.max <= octXBase.q2) octXBase.min else octXBase.max
-    val xProbe: Double = min(octXBase.max, rectangle.x.max)
+    val xProbe: Double =
+      if (rectangle.x.contains(octXBase.q2)) {
+        // TODO remove after debugging!
+        println(f"    Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
+        octXBase.q2
+      } else {
+        if (octXBase.q2 <= rectangle.x.min) {
+          // TODO remove after debugging!
+          println(f"    Right of oct mid, using r.x.min ${rectangle.x.min}%1.3f")
+          rectangle.x.min
+        } else {
+          // TODO remove after debugging!
+          println(f"    Left of oct mid, using r.x.max ${rectangle.x.max}%1.3f")
+          rectangle.x.max
+        }
+      }
+    require(xProbe >= octXBase.min && xProbe <= octXBase.max, "Invalid xProbe")
     val yEq = slope * (xProbe - x0) + b
     val inside = if (isApexUp) yProbe <= yEq else yProbe >= yEq
 
     // TODO:  remove after debugging
-    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f, $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
+    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
+    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
 
     inside
   }
@@ -630,6 +648,10 @@ object TriN {
     // translate the geo coordinates to octahedral coordinates
     val octXMin = Math.min(geoToOctX(ymin)(geoXMin), geoToOctX(ymax)(geoXMin))
     val octXMax = Math.max(geoToOctX(ymin)(geoXMax), geoToOctX(ymax)(geoXMax))
+
+    // TODO remove after debugging!
+    //println(f"TriN.getRanges($geoXMin%1.3f, $ymin%1.3f, $geoXMax%1.3f, $ymax%1.3f, $maxDepth%d)")
+    //println(f"  ... becomes oct X $octXMin%1.3f, $octXMax%1.3f")
 
     // find the top-level octahedron faces that intersect the query region at all
     val faces: Vector[Triangle] = OctahedronFaces.filter(t => t.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
