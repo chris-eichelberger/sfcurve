@@ -66,6 +66,10 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     0.5 * (geoXApex.max + geoXBase.max)
   )
 
+  def octContained(octXMin: Double, ymin: Double, octXMax: Double, ymax: Double): Boolean = {
+    octXMin >= octXBase.min && octXMax <= octXBase.max && ymin >= Y.min && ymax <= Y.max
+  }
+
   def octOverlaps(rectangle: Rectangle): Boolean = {
     // TODO:  remove after debugging
     //val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
@@ -225,6 +229,15 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
       return Seq(IndexRange(index, index, contained = true))
     }
     if (depth > maxDepth) throw new Exception("Should not be able to recurse this far")
+
+    // if you're entirely inside the query area, just return everything (down to the maximum depth)
+    if (bounds.octContained(octXMin, ymin, octXMax, ymax)) {
+      // TODO remove after debugging
+      //println(s"$this Contained!")
+      val firstDescendant: Triangle = (1 to (maxDepth - depth)).foldLeft(this)((acc, i) => acc.child(TransApex))
+      val lastDescendant: Triangle = (1 to (maxDepth - depth)).foldLeft(this)((acc, i) => acc.child(TransLL))
+      return Seq(IndexRange(firstDescendant.index, lastDescendant.index, contained = true))
+    }
 
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
