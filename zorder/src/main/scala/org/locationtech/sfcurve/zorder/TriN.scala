@@ -214,8 +214,31 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   // degenerate for the Curve contract
   override def toPoint(index: Long): (Double, Double) = bounds.geoCenter
 
+  def compactIndex = java.lang.Long.parseLong(bitString.sliding(3, 3).zipWithIndex.map {
+    case (bits, i) =>
+      if (i == 0) {
+        // all 8 options are valid (3 bits)
+        bits
+      } else {
+        // there are only 4 valid options
+        if (bits == "100") "11" else bits.substring(1, 3)
+      }
+  }.mkString(""), 2)
+
   // every triangle has four smaller sub-triangle children
   def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
+
+  def getRangeIndex: Long = if (TriN.UseCompactIndex) compactIndex else index
+
+  def getChildIndexRange(maxDepth: Int): IndexRange = {
+    require(maxDepth >= depth)
+
+    val firstDescendant: Triangle = TriN.invIndex(bitString + "000" * (maxDepth - depth))
+    val lastDescendant: Triangle = TriN.invIndex(bitString + "100" * (maxDepth - depth))
+    require(firstDescendant.index < lastDescendant.index, s"Child index-range values were returned out of order:  $bitString -> ${firstDescendant.bitString} to ${lastDescendant.bitString}")
+
+    IndexRange(firstDescendant.getRangeIndex, lastDescendant.getRangeIndex, contained = true)
+  }
 
   // called by TriN and itself
   // assumes that you are given OCTAHEDRAL coordinates!
@@ -226,24 +249,18 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     // check stop conditions
     if (depth == maxDepth) {
       // if you've gotten here, then your (single) index is the only thing to return
-      return Seq(IndexRange(index, index, contained = true))
+      return Seq(IndexRange(getRangeIndex, getRangeIndex, contained = true))
     }
     if (depth > maxDepth) throw new Exception("Should not be able to recurse this far")
 
     // if you're entirely inside the query area, just return everything (down to the maximum depth)
-    if (bounds.octContained(octXMin, ymin, octXMax, ymax)) {
-      // TODO remove after debugging
-      //println(s"$this Contained!")
-      val firstDescendant: Triangle = (1 to (maxDepth - depth)).foldLeft(this)((acc, i) => acc.child(TransApex))
-      val lastDescendant: Triangle = (1 to (maxDepth - depth)).foldLeft(this)((acc, i) => acc.child(TransLL))
-      return Seq(IndexRange(firstDescendant.index, lastDescendant.index, contained = true))
-    }
+    if (bounds.octContained(octXMin, ymin, octXMax, ymax))
+      return Seq(getChildIndexRange(maxDepth))
 
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
     if (subs.isEmpty) {
       throw new Exception(s"Parent overlaps geo bounds, but no child (of ${childTriangles.size}) does")
-      //return Seq[IndexRange]()
     }
 
     // recurse, and combine the results
@@ -405,6 +422,8 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
 }
 
 object TriN {
+  val UseCompactIndex: Boolean = true
+
   val ApexBias: Double = 1e-14
 
   def min(x: Double*): Double = x.min

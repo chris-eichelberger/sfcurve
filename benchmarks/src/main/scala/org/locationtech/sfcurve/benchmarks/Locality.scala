@@ -322,6 +322,8 @@ object Locality extends App {
   println(s"  Triangle depth:  ${TriangleDepth}")
   println(s"  Triangle cardinality:  ${t2.cardinality}")
   println(s"    Quad equivalent bit-string length:  ${(Math.log(t2.cardinality) / Math.log(2.0)) - 0.0}")
+  val t33 = TriN.createLowestIndex(11)
+  val t36 = TriN.createLowestIndex(12)
 
   // unit testing
   println("\nUnit test results...")
@@ -360,8 +362,30 @@ object Locality extends App {
     assert(Math.abs(point._1 - -78.495150) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
     assert(Math.abs(point._2 - 38.075776) <= Math.pow(10.0, 2-(TriangleDepth >> 2)))
 
-    //System.exit(-1)
   }
+
+  // validate that the compact indexes work as expected
+  def testCompactIndex(fullIndexBitString: String, expectedCompactIndex: Long): Unit = {
+    require(fullIndexBitString.length % 3 == 0)
+    val depth: Int = fullIndexBitString.length / 3
+    val t: Triangle = TriN.invIndex(java.lang.Long.parseLong(fullIndexBitString, 2), depth)
+    val compact: Long = t.compactIndex
+    assert(compact == expectedCompactIndex, s"The compact index failed for $t:  expected $expectedCompactIndex, but got $compact")
+  }
+  testCompactIndex("000", 0)
+  testCompactIndex("001", 1)
+  testCompactIndex("010", 2)
+  testCompactIndex("011", 3)
+  testCompactIndex("100", 4)
+  testCompactIndex("101", 5)
+  testCompactIndex("110", 6)
+  testCompactIndex("111", 7)
+  testCompactIndex("111000001001010100010000", java.lang.Long.parseLong("11100010110111000", 2))
+  val t0: Triangle = TriN.getTriangle(-78.5, 38.1, 8)
+  val range0: IndexRange = t0.getChildIndexRange(9)
+  assert(range0.size == 4, s"Range size is wrong:  expected 4, but got $range0 -> ${range0.size}")
+  val range1: IndexRange = t0.getChildIndexRange(12)
+  assert(range1.size == 256, s"Range size is wrong:  expected 64, but got $range1 -> ${range1.size}")
 
   println("\nRunning...")
 
@@ -408,7 +432,7 @@ object Locality extends App {
 
   for (sampler <- samplers) {
     //Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
-    Table(sampler, verbose = false, t2).exhaust(ps)
+    Table(sampler, verbose = false, z2, h2, t2, t33, t36).exhaust(ps)
   }
 
   ps.close()
