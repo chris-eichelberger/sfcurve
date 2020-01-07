@@ -121,6 +121,7 @@ object Locality extends App {
       val a2: Point = curvePointFromIndex(ai2)
       val bi2: Long = curve.toIndex(points.b.x.degrees, points.b.y.degrees)
       val b2: Point = curvePointFromIndex(bi2)
+
       Points(a2, b2)
     }
 
@@ -306,7 +307,7 @@ object Locality extends App {
 
   // set up
   println("Setting up...")
-  val bitsPrecision: Long = 36
+  val bitsPrecision: Long = 24
   //require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   require(bitsPrecision < 64, "Must not have more bits than fit in a Long")
@@ -405,6 +406,8 @@ object Locality extends App {
   val querySizeDegrees: Double = 1.0
   val queries = Seq(QuerySampler(numRandomQueries, querySizeDegrees))
 
+  val smallQueries = Seq(QuerySampler(10, querySizeDegrees))
+
   val CharlottesvillePoints = Seq[Points](
     Points(
       Point(Degrees(-78.495150), Degrees(38.075776)),  // CCRi
@@ -431,7 +434,7 @@ object Locality extends App {
   val samplers: Seq[Sampler] = queries
 
   for (sampler <- samplers) {
-    //Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
+    //Table(sampler, verbose = false, z2, h2, t2, t33, t36).exhaust(ps)
     Table(sampler, verbose = false, z2, h2, t2, t33, t36).exhaust(ps)
   }
 

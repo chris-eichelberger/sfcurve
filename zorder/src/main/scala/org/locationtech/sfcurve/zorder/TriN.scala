@@ -201,7 +201,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
 
   override val cardinality: Long = 8L * Math.pow(4L, depth.toLong - 1L).toLong
 
-  val name: String = "Triangle"
+  val name: String = s"Triangle${depth}"
 
   def bitString: String = indexBinaryString(index, depth)
 
@@ -212,7 +212,9 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   }
 
   // degenerate for the Curve contract
-  override def toPoint(index: Long): (Double, Double) = bounds.geoCenter
+  override def toPoint(index: Long): (Double, Double) = {
+    TriN.invIndex(index, depth).bounds.geoCenter
+  }
 
   def compactIndex = java.lang.Long.parseLong(bitString.sliding(3, 3).zipWithIndex.map {
     case (bits, i) =>
