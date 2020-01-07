@@ -288,9 +288,11 @@ object Locality extends App {
     val allcols: Seq[String] = CartesianProductIterable(Seq(columns, curves.map(_.name))).iterator.toSeq.map(_.mkString("_"))
     def exhaust(ps: PrintStream): Unit = {
       ps.println("from_wkt,to_wkt,plane,sphere," + allcols.mkString(","))
+      var n: Long = 0L
       while (sampler.hasNext) {
         val sample = sampler.next()
-        println(s"  Processing sample ${sample.a.wkt}, ${sample.b.wkt}...")
+        if ((n % 100) == 0) println(s"  Processing sample $n:  ${sample.a.wkt}, ${sample.b.wkt}...")
+        n += 1L
         ps.print(s"${sample.a.wkt},${sample.b.wkt},${sample.dPlane()},${sample.dSphere()}")
         distances.foreach {
           case (curve, dists) =>
@@ -304,12 +306,13 @@ object Locality extends App {
 
   // set up
   println("Setting up...")
-  val bitsPrecision: Long = 33
-//  require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
-//  require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
-  val cardinality = 1L << bitsPrecision
+  val bitsPrecision: Long = 24
+  require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
+  require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
+  require(bitsPrecision < 64, "Must not have more bits than fit in a Long")
+  val quadCardinality = 1L << bitsPrecision
   val cardPerDim = 1L << (bitsPrecision >> 1L)
-  println(s"  Bits precision $bitsPrecision, cardinality $cardinality")
+  println(s"  Bits precision $bitsPrecision, quad-tree cardinality $quadCardinality")
   val z2 = new ZCurve2D(cardPerDim.toInt)
   println(s"  Z2 cardinality ${z2.cardinality}")
   val h2 = new HilbertCurve2D(cardPerDim.toInt)
@@ -318,6 +321,7 @@ object Locality extends App {
   val t2 = TriN.createLowestIndex(TriangleDepth)
   println(s"  Triangle depth:  ${TriangleDepth}")
   println(s"  Triangle cardinality:  ${t2.cardinality}")
+  println(s"    Quad equivalent bit-string length:  ${(Math.log(t2.cardinality) / Math.log(2.0)) - 0.0}")
 
   // unit testing
   println("\nUnit test results...")
@@ -400,11 +404,11 @@ object Locality extends App {
     )
   )))
 
-  val samplers: Seq[Sampler] = debugQueries
+  val samplers: Seq[Sampler] = queries
 
   for (sampler <- samplers) {
     //Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
-    Table(sampler, verbose = false, t2).exhaust(ps)
+    Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
   }
 
   ps.close()

@@ -68,29 +68,30 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
 
   def octOverlaps(rectangle: Rectangle): Boolean = {
     // TODO:  remove after debugging
-    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
-    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
+    //val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
+    //val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
 
     // simple vertical elimination
     if (rectangle.y.max < Y.min) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
+      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
       return false
     }
     if (rectangle.y.min > Y.max) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
+      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
       return false
     }
 
     // simple horizontal elimination
     if (rectangle.x.max < octXBase.min) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
+      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
       return false
     }
     if (rectangle.x.min > octXBase.max) {
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
+      // TODO:  remove after debugging
+      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
       return false
     }
 
@@ -106,16 +107,16 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val xProbe: Double =
       if (rectangle.x.contains(octXBase.q2)) {
         // TODO remove after debugging!
-        println(f"    Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
+        //println(f"    Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
         octXBase.q2
       } else {
         if (octXBase.q2 <= rectangle.x.min) {
           // TODO remove after debugging!
-          println(f"    Right of oct mid, using r.x.min ${rectangle.x.min}%1.3f")
+          //println(f"    Right of oct mid, using r.x.min ${rectangle.x.min}%1.3f")
           rectangle.x.min
         } else {
           // TODO remove after debugging!
-          println(f"    Left of oct mid, using r.x.max ${rectangle.x.max}%1.3f")
+          //println(f"    Left of oct mid, using r.x.max ${rectangle.x.max}%1.3f")
           rectangle.x.max
         }
       }
@@ -124,8 +125,8 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val inside = if (isApexUp) yProbe <= yEq else yProbe >= yEq
 
     // TODO:  remove after debugging
-    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
-    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
+    //println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
+    //println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
 
     inside
   }
@@ -216,7 +217,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   // assumes that you are given OCTAHEDRAL coordinates!
   def getRangesRecursively(octXMin: Double, ymin: Double, octXMax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
     // TODO remove after debugging
-    println(f"  getRangesRecursively... ($octXMin%1.3f, $ymin%1.3f, $octXMax%1.3f, $ymax%1.3f, $maxDepth%1d)")
+    //println(f"  getRangesRecursively... ($octXMin%1.3f, $ymin%1.3f, $octXMax%1.3f, $ymax%1.3f, $maxDepth%1d)")
 
     // check stop conditions
     if (depth == maxDepth) {
