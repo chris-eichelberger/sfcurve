@@ -306,8 +306,8 @@ object Locality extends App {
 
   // set up
   println("Setting up...")
-  val bitsPrecision: Long = 24
-  require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
+  val bitsPrecision: Long = 36
+  //require((bitsPrecision % 2) == 0, "bitsPrecision must be divisible by 2 for Z2, H2")
   require((bitsPrecision % 3) == 0, "bitsPrecision must be divisible by 3 for T2")
   require(bitsPrecision < 64, "Must not have more bits than fit in a Long")
   val quadCardinality = 1L << bitsPrecision
@@ -408,7 +408,7 @@ object Locality extends App {
 
   for (sampler <- samplers) {
     //Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
-    Table(sampler, verbose = false, z2, h2, t2).exhaust(ps)
+    Table(sampler, verbose = false, t2).exhaust(ps)
   }
 
   ps.close()
