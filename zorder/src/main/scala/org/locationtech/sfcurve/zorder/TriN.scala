@@ -216,16 +216,9 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     TriN.invIndex(index, depth).bounds.geoCenter
   }
 
-  def compactIndex = java.lang.Long.parseLong(bitString.sliding(3, 3).zipWithIndex.map {
-    case (bits, i) =>
-      if (i == 0) {
-        // all 8 options are valid (3 bits)
-        bits
-      } else {
-        // there are only 4 valid options
-        if (bits == "100") "11" else bits.substring(1, 3)
-      }
-  }.mkString(""), 2)
+  def expandedIndex: Long = TriN.expandedIndex(bitString)
+
+  def compactIndex: Long = TriN.compactIndex(bitString)
 
   // every triangle has four smaller sub-triangle children
   def childTriangles: Seq[Triangle] = Transitions.toSeq.map(child)
@@ -661,6 +654,19 @@ object TriN {
     CB_A -> "CB|A"
   )
 
+  def expandedIndex(bits: String): Long = {
+    val octFace: Long = java.lang.Long.parseLong(bits.take(3), 2)
+    bits.drop(3).sliding(2, 2).foldLeft(octFace)((acc, bb) => {
+      val bval: Long = java.lang.Long.parseLong(bb, 2)
+      (acc << 3L) | (if (bval == 3) 4 else bval)
+    })
+  }
+
+  def compactIndex(bitString: String): Long = {
+    val longs: List[Long] = bitString.sliding(3, 3).map(bits => java.lang.Long.parseLong(bits, 2)).toList
+    longs.tail.foldLeft(longs.head)((acc, bb) => (acc << 2) | (if (bb == 4) 3 else bb))
+  }
+
   def topOrientation(ix: Int, iy: Int): Int = {
     require(ix >= 0 && ix < 4)
     require(iy >= 0 && iy < 2)
@@ -771,8 +777,10 @@ object TriN {
     }
   }
 
-  def indexBinaryString(index: Long, depth: Int): String =
-    index.toBinaryString.reverse.padTo(3 * depth, "0").reverse.mkString("")
+  def longToBinaryString(long: Long, length: Int): String =
+    long.toBinaryString.reverse.padTo(length, "0").reverse.mkString("")
+
+  def indexBinaryString(index: Long, depth: Int): String = longToBinaryString(index, 3 * depth)
 
   def indexOctalString(index: Long, depth: Int): String = {
     (0 until depth).map(pos => ((index >> (3 * pos)) & 7L).toString).reverse.mkString("")
@@ -1045,6 +1053,23 @@ object TriTest extends App {
     testOverlap(-73.0, 34.0, expectation = true)
   }
 
+  // ensure that you can convert between compact and expanded index forms
+  for (depth <- Seq(5); t <- iterator(depth)) {
+    val nativeIndex = t.index
+    val nativeIndexString = TriN.indexBinaryString(nativeIndex, depth)
+    val nativeIndexLength = 3 * depth
+    val compactIndex = TriN.compactIndex(nativeIndexString)
+    val compactIndexLength = 3 + (2 * (depth - 1))
+    val compactIndexString = TriN.longToBinaryString(compactIndex, compactIndexLength)
+    val expandedIndex = TriN.expandedIndex(compactIndexString)
+    val expandedIndexString = TriN.indexBinaryString(expandedIndex, depth)
+    require(nativeIndexString.length == nativeIndexLength, s"Expected native index string to have $nativeIndexLength character(s), found ${nativeIndexString.length} instead")
+    require(compactIndexString.length == compactIndexLength, s"Expected compact index string to have $compactIndexLength character(s), found ${compactIndexString.length} instead")
+    require(expandedIndexString.length == nativeIndexLength, s"Expected expanded index string to have $nativeIndexLength character(s), found ${expandedIndexString.length} instead")
+    //println(s"Native $nativeIndex $nativeIndexString -> $compactIndex $compactIndexString -> $expandedIndex $expandedIndexString")
+    require(expandedIndex == nativeIndex, s"Native index ($nativeIndex, $nativeIndexString) != expanded index ($expandedIndex, $expandedIndexString)")
+  }
+
   def poly(geoMinX: Double, minY: Double, geoMaxX: Double, maxY: Double): String =
     "POLYGON((" +
     s"$geoMinX $minY, " +
@@ -1067,11 +1092,17 @@ object TriTest extends App {
     val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
     val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
     val rect = Rectangle(Extent(geoX0, geoX1), Extent(y0, y1))
-    val t = TriN.getTriangle(point.x.degrees, point.y.degrees, depth)
+    val tOctFace = TriN.getTriangle(point.x.degrees, point.y.degrees, 1)
     pw = new PrintWriter(new FileWriter(s"test-query-d${depth}.txt"))
     pw.println(s"nature\toct_wkt")
     pw.println(s"query, geo\t${poly(geoX0, y0, geoX1, y1)}")
     pw.println(s"query, oct\t${poly(octX0, y0, octX1, y1)}")
+    val ranges = tOctFace.getRangesRecursively(octX0, y0, octX1, y1, depth)
+    for (range <- ranges; rangeIndex <- range.lower to range.upper) {
+      val tIndex = TriN.expandedIndex(TriN.indexBinaryString(rangeIndex, depth))
+      val t = TriN.invIndex(tIndex, depth)
+      pw.println(s"range member\t${t.octWkt}")
+    }
     pw.close()
 
 
