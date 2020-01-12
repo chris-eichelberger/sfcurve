@@ -1086,7 +1086,7 @@ object TriTest extends App {
   // (these are not unit tests so much as manual validation tests)
   try {
     // write out a query and the resulting ranges ask WKTs
-    for (depth <- Seq(5, 6)) {
+    for (depth <- Seq(5, 10, 15)) {
       val point = Point(Degrees(-78.688256), Degrees(38.054444))
       val geoX0: Double = Math.floor(point.x.degrees)
       val geoX1: Double = Math.ceil(point.x.degrees)
@@ -1095,7 +1095,7 @@ object TriTest extends App {
       val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
       val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
       val tOctFace = TriN.getTriangle(point.x.degrees, point.y.degrees, 1)
-      println(s"point $point, oct face $tOctFace")
+      println(s"depth $depth, point $point, oct face $tOctFace")
       pw = new PrintWriter(new FileWriter(s"test-query-d${depth}.txt"))
       pw.println(s"nature\tgeo_wkt\toct_wkt")
       pw.println(s"query\t${poly(geoX0, y0, geoX1, y1)}\t${poly(octX0, y0, octX1, y1)}")
@@ -1103,7 +1103,7 @@ object TriTest extends App {
       for (range <- ranges; rangeIndex <- range.lower to range.upper) {
         val tIndex = TriN.expandedIndex(rangeIndex, depth)
         val t = TriN.invIndex(tIndex, depth)
-        println(s"range index $rangeIndex, expanded $tIndex, triangle $t")
+        //println(s"range index $rangeIndex, expanded $tIndex, triangle $t")
         pw.println(s"range\t\t${t.octWkt}")
       }
       pw.close()
