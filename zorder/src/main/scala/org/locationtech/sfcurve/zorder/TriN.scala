@@ -278,13 +278,18 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
     if (subs.isEmpty) {
-      throw new Exception(s"Parent overlaps geo bounds, but no child (of ${childTriangles.size}) does")
+      throw new Exception(s"Parent\n  $this\noverlaps geo bounds\n  ($octXMin, $ymin, $octXMax, $ymax)\nbut no child does:${childTriangles.map(_.toString).mkString("\n  ", "\n  ", "")}")
     }
 
     // recurse, and combine the results
     subs.tail.foldLeft(subs.head.getRangesRecursively(octXMin, ymin, octXMax, ymax, maxDepth))((acc, t) => {
       t.consolidateRanges((acc ++ t.getRangesRecursively(octXMin, ymin, octXMax, ymax, maxDepth)).iterator).toSeq
     })
+  }
+
+  def parentOpt: Option[Triangle] = {
+    if (depth == 1) return None
+    Option(TriN.invIndex(index >> 3L, depth - 1))
   }
 
   // degenerate for the Curve contract
