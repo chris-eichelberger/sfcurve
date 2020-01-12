@@ -216,7 +216,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     TriN.invIndex(index, depth).bounds.geoCenter
   }
 
-  def expandedIndex: Long = TriN.expandedIndex(bitString)
+  def expandedIndex(cIdx: Long): Long = TriN.expandedIndex(TriN.longToBinaryString(cIdx, 3 + 2 * (depth -1)))
 
   def compactIndex: Long = TriN.compactIndex(bitString)
 
@@ -238,9 +238,6 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
   // called by TriN and itself
   // assumes that you are given OCTAHEDRAL coordinates!
   def getRangesRecursively(octXMin: Double, ymin: Double, octXMax: Double, ymax: Double, maxDepth: Int): Seq[IndexRange] = {
-    // TODO remove after debugging
-    //println(f"  getRangesRecursively... ($octXMin%1.3f, $ymin%1.3f, $octXMax%1.3f, $ymax%1.3f, $maxDepth%1d)")
-
     // check stop conditions
     if (depth == maxDepth) {
       // if you've gotten here, then your (single) index is the only thing to return
@@ -653,6 +650,10 @@ object TriN {
     BC_A -> "BC|A",
     CB_A -> "CB|A"
   )
+
+  def compactIndexLength(depth: Int): Int = Math.max(3, 3 + 2 * (depth - 1))
+
+  def expandedIndex(index: Long, depth: Int): Long = expandedIndex(longToBinaryString(index, compactIndexLength(depth)))
 
   def expandedIndex(bits: String): Long = {
     val octFace: Long = java.lang.Long.parseLong(bits.take(3), 2)
@@ -1068,6 +1069,8 @@ object TriTest extends App {
     require(expandedIndexString.length == nativeIndexLength, s"Expected expanded index string to have $nativeIndexLength character(s), found ${expandedIndexString.length} instead")
     //println(s"Native $nativeIndex $nativeIndexString -> $compactIndex $compactIndexString -> $expandedIndex $expandedIndexString")
     require(expandedIndex == nativeIndex, s"Native index ($nativeIndex, $nativeIndexString) != expanded index ($expandedIndex, $expandedIndexString)")
+    val tInv = TriN.invIndex(expandedIndex, depth)
+    require(t.index == tInv.index, s"Round-trip index failed:  $t != $tInv")
   }
 
   def poly(geoMinX: Double, minY: Double, geoMaxX: Double, maxY: Double): String =
@@ -1083,28 +1086,28 @@ object TriTest extends App {
   // (these are not unit tests so much as manual validation tests)
   try {
     // write out a query and the resulting ranges ask WKTs
-    val depth = 5
-    val point = Point(Degrees(-78.688256), Degrees(38.054444))
-    val geoX0: Double = Math.floor(point.x.degrees)
-    val geoX1: Double = Math.ceil(point.x.degrees)
-    val y0: Double = Math.floor(point.y.degrees)
-    val y1: Double = Math.ceil(point.y.degrees)
-    val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
-    val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
-    val rect = Rectangle(Extent(geoX0, geoX1), Extent(y0, y1))
-    val tOctFace = TriN.getTriangle(point.x.degrees, point.y.degrees, 1)
-    pw = new PrintWriter(new FileWriter(s"test-query-d${depth}.txt"))
-    pw.println(s"nature\toct_wkt")
-    pw.println(s"query, geo\t${poly(geoX0, y0, geoX1, y1)}")
-    pw.println(s"query, oct\t${poly(octX0, y0, octX1, y1)}")
-    val ranges = tOctFace.getRangesRecursively(octX0, y0, octX1, y1, depth)
-    for (range <- ranges; rangeIndex <- range.lower to range.upper) {
-      val tIndex = TriN.expandedIndex(TriN.indexBinaryString(rangeIndex, depth))
-      val t = TriN.invIndex(tIndex, depth)
-      pw.println(s"range member\t${t.octWkt}")
+    for (depth <- Seq(5, 6)) {
+      val point = Point(Degrees(-78.688256), Degrees(38.054444))
+      val geoX0: Double = Math.floor(point.x.degrees)
+      val geoX1: Double = Math.ceil(point.x.degrees)
+      val y0: Double = Math.floor(point.y.degrees)
+      val y1: Double = Math.ceil(point.y.degrees)
+      val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
+      val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
+      val tOctFace = TriN.getTriangle(point.x.degrees, point.y.degrees, 1)
+      println(s"point $point, oct face $tOctFace")
+      pw = new PrintWriter(new FileWriter(s"test-query-d${depth}.txt"))
+      pw.println(s"nature\tgeo_wkt\toct_wkt")
+      pw.println(s"query\t${poly(geoX0, y0, geoX1, y1)}\t${poly(octX0, y0, octX1, y1)}")
+      val ranges = tOctFace.getRangesRecursively(octX0, y0, octX1, y1, depth)
+      for (range <- ranges; rangeIndex <- range.lower to range.upper) {
+        val tIndex = TriN.expandedIndex(rangeIndex, depth)
+        val t = TriN.invIndex(tIndex, depth)
+        println(s"range index $rangeIndex, expanded $tIndex, triangle $t")
+        pw.println(s"range\t\t${t.octWkt}")
+      }
+      pw.close()
     }
-    pw.close()
-
 
 //    pw = new PrintWriter(new FileWriter("test-points.txt"))
 //    pw.println("name\tgeo_wkt\toct_wkt")
