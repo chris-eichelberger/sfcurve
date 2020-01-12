@@ -6,6 +6,7 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 import scala.collection.mutable.{Map => MutableMap}
 import org.locationtech.sfcurve.hilbert.HilbertCurve2D
+import org.locationtech.sfcurve.zorder.TriN.{Degrees, Point}
 import org.locationtech.sfcurve.zorder.{TriN, Triangle, ZCurve2D}
 import org.locationtech.sfcurve.{Dimensions, IndexRange, RangeComputeHints, SpaceFillingCurve2D}
 
@@ -36,14 +37,6 @@ object Locality extends App {
     }
 
     result
-  }
-
-  case class Degrees(degrees: Double) {
-    def radians: Double = Math.toRadians(degrees)
-  }
-
-  case class Point(x: Degrees, y: Degrees) {
-    def wkt: String = "POINT(" + x.degrees + " " + y.degrees + ")"
   }
 
   case class Points(a: Point, b: Point, verbose: Boolean = false) {

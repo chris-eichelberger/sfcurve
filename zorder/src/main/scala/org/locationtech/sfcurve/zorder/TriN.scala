@@ -833,6 +833,15 @@ object TriN {
       t0.bounds.octXMid + " " + t0.bounds.yMid + ", " +
       t1.bounds.octXMid + " " + t1.bounds.yMid +
       ")"
+
+  case class Degrees(degrees: Double) {
+    def radians: Double = Math.toRadians(degrees)
+  }
+
+  case class Point(x: Degrees, y: Degrees) {
+    def wkt: String = "POINT(" + x.degrees + " " + y.degrees + ")"
+  }
+
 }
 
 object NamedLocations {
@@ -1036,69 +1045,96 @@ object TriTest extends App {
     testOverlap(-73.0, 34.0, expectation = true)
   }
 
+  def poly(geoMinX: Double, minY: Double, geoMaxX: Double, maxY: Double): String =
+    "POLYGON((" +
+    s"$geoMinX $minY, " +
+    s"$geoMinX $maxY, " +
+    s"$geoMaxX $maxY, " +
+    s"$geoMaxX $minY, " +
+    s"$geoMinX $minY" +
+    "))"
+
   // dump files out that we want to visualize
   // (these are not unit tests so much as manual validation tests)
   try {
-    pw = new PrintWriter(new FileWriter("test-points.txt"))
-    pw.println("name\tgeo_wkt\toct_wkt")
-    LocationsByName.foreach {
-      case (name, LatLon(y, geoX)) =>
-        val t = getInitialTriangle(geoX, y)
-        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(y)(geoX)} $y)")
-    }
+    // write out a query and the resulting ranges ask WKTs
+    val depth = 5
+    val point = Point(Degrees(-78.688256), Degrees(38.054444))
+    val geoX0: Double = Math.floor(point.x.degrees)
+    val geoX1: Double = Math.ceil(point.x.degrees)
+    val y0: Double = Math.floor(point.y.degrees)
+    val y1: Double = Math.ceil(point.y.degrees)
+    val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
+    val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
+    val rect = Rectangle(Extent(geoX0, geoX1), Extent(y0, y1))
+    val t = TriN.getTriangle(point.x.degrees, point.y.degrees, depth)
+    pw = new PrintWriter(new FileWriter(s"test-query-d${depth}.txt"))
+    pw.println(s"nature\toct_wkt")
+    pw.println(s"query, geo\t${poly(geoX0, y0, geoX1, y1)}")
+    pw.println(s"query, oct\t${poly(octX0, y0, octX1, y1)}")
     pw.close()
 
-    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
-    pw.println("index\toct_wkt\tgeo_wkt")
-    for (row <- 0 to 1; col <- 0 to 3) {
-      val x0 = -180.0 + 90.0 * col
-      val y0 = -90.0 + 90.0 * row
-      val x1 = x0 + 90.0 - 1e-6
-      val y1 = y0 + 90.0 - 1e-6
-      val xMid = 0.5 * (x0 + x1)
-      val yMid = 0.5 * (y0 + y1)
-      val t = getInitialTriangle(xMid, yMid)
-      pw.println(s"${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
-    }
-    pw.close()
 
-    pw = new PrintWriter(new FileWriter("test-index.txt"))
-    pw.println("depth\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tarea_deg2\tarea_m2")
-    val target: LatLon = LocationsByName("Eichelberger")
-    (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
-      case (x, y) =>
-        val t = getTriangle(target.longitude, target.latitude, depth)
-        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
-        (x, y)
-    })
-    pw.close()
-
-    pw = new PrintWriter(new FileWriter("test-tiles.txt"))
-    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tis_all_apex")
-    for (t <- iterator(3)) {
-      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${indexOctalString(t.index, t.depth)}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
-    }
-    pw.close()
-
-    pw = new PrintWriter(new FileWriter("test-progression.txt"))
-    pw.println("index_from\tindex_to\toct_wkt\tgeo_wkt")
-    for (t <- iterator(4).sliding(2, 1)) t match {
-      case Seq(t0, t1) =>
-        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}\t${octLineWkt(t0, t1)}")
-    }
-    pw.close()
-
-    // validate the 2D geo/oct coordinate translation
-    pw = new PrintWriter(new FileWriter("test-oct2geo.txt"))
-    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt")
-    val target2: LatLon = LocationsByName("Eichelberger")
-    (1 to 3).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
-      case (x, y) =>
-        val t = getTriangle(target2.longitude, target2.latitude, depth)
-        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt)
-        (x, y)
-    })
-    pw.close()
+//    pw = new PrintWriter(new FileWriter("test-points.txt"))
+//    pw.println("name\tgeo_wkt\toct_wkt")
+//    LocationsByName.foreach {
+//      case (name, LatLon(y, geoX)) =>
+//        val t = getInitialTriangle(geoX, y)
+//        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(y)(geoX)} $y)")
+//    }
+//    pw.close()
+//
+//    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
+//    pw.println("index\toct_wkt\tgeo_wkt")
+//    for (row <- 0 to 1; col <- 0 to 3) {
+//      val x0 = -180.0 + 90.0 * col
+//      val y0 = -90.0 + 90.0 * row
+//      val x1 = x0 + 90.0 - 1e-6
+//      val y1 = y0 + 90.0 - 1e-6
+//      val xMid = 0.5 * (x0 + x1)
+//      val yMid = 0.5 * (y0 + y1)
+//      val t = getInitialTriangle(xMid, yMid)
+//      pw.println(s"${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
+//    }
+//    pw.close()
+//
+//    pw = new PrintWriter(new FileWriter("test-index.txt"))
+//    pw.println("depth\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tarea_deg2\tarea_m2")
+//    val target: LatLon = LocationsByName("Eichelberger")
+//    (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
+//      case (x, y) =>
+//        val t = getTriangle(target.longitude, target.latitude, depth)
+//        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
+//        (x, y)
+//    })
+//    pw.close()
+//
+//    pw = new PrintWriter(new FileWriter("test-tiles.txt"))
+//    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tis_all_apex")
+//    for (t <- iterator(3)) {
+//      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${indexOctalString(t.index, t.depth)}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
+//    }
+//    pw.close()
+//
+//    pw = new PrintWriter(new FileWriter("test-progression.txt"))
+//    pw.println("index_from\tindex_to\toct_wkt\tgeo_wkt")
+//    for (t <- iterator(4).sliding(2, 1)) t match {
+//      case Seq(t0, t1) =>
+//        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}\t${octLineWkt(t0, t1)}")
+//    }
+//    pw.close()
+//
+//    // validate the 2D geo/oct coordinate translation
+//    pw = new PrintWriter(new FileWriter("test-oct2geo.txt"))
+//    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt")
+//    val target2: LatLon = LocationsByName("Eichelberger")
+//    (1 to 3).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
+//      case (x, y) =>
+//        val t = getTriangle(target2.longitude, target2.latitude, depth)
+//        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt)
+//        (x, y)
+//    })
+//    pw.close()
 
   } finally {
     pw.close()
