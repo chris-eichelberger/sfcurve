@@ -1073,6 +1073,22 @@ object TriTest extends App {
     require(t.index == tInv.index, s"Round-trip index failed:  $t != $tInv")
   }
 
+  // test query known to return 8 triangles if working correctly
+  {
+    val depth = 8
+    val point = Point(Degrees(-78.688256), Degrees(38.054444))
+    val geoX0: Double = Math.floor(point.x.degrees)
+    val geoX1: Double = Math.ceil(point.x.degrees)
+    val y0: Double = Math.floor(point.y.degrees)
+    val y1: Double = Math.ceil(point.y.degrees)
+    val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
+    val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
+    val tOctFace = TriN.getTriangle(point.x.degrees, point.y.degrees, 1)
+    val ranges = tOctFace.getRangesRecursively(octX0, y0, octX1, y1, depth)
+    val numTriangles = ranges.map(range => range.upper - range.lower + 1).sum
+    require(numTriangles == 8, s"Query for geo ($geoX0, $y0, $geoX1, $y1) expected 8 triangles, but got $numTriangles")
+  }
+
   def poly(geoMinX: Double, minY: Double, geoMaxX: Double, maxY: Double): String =
     "POLYGON((" +
     s"$geoMinX $minY, " +
@@ -1086,7 +1102,7 @@ object TriTest extends App {
   // (these are not unit tests so much as manual validation tests)
   try {
     // write out a query and the resulting ranges ask WKTs
-    for (depth <- Seq(5, 10, 15)) {
+    for (depth <- Seq(6, 7, 8, 9)) {
       val point = Point(Degrees(-78.688256), Degrees(38.054444))
       val geoX0: Double = Math.floor(point.x.degrees)
       val geoX1: Double = Math.ceil(point.x.degrees)
@@ -1097,14 +1113,14 @@ object TriTest extends App {
       val tOctFace = TriN.getTriangle(point.x.degrees, point.y.degrees, 1)
       println(s"depth $depth, point $point, oct face $tOctFace")
       pw = new PrintWriter(new FileWriter(s"test-query-d${depth}.txt"))
-      pw.println(s"nature\tgeo_wkt\toct_wkt")
-      pw.println(s"query\t${poly(geoX0, y0, geoX1, y1)}\t${poly(octX0, y0, octX1, y1)}")
+      pw.println(s"nature\tindex\tbits\tgeo_wkt\toct_wkt")
+      pw.println(s"query\t\t\t${poly(geoX0, y0, geoX1, y1)}\t${poly(octX0, y0, octX1, y1)}")
       val ranges = tOctFace.getRangesRecursively(octX0, y0, octX1, y1, depth)
       for (range <- ranges; rangeIndex <- range.lower to range.upper) {
         val tIndex = TriN.expandedIndex(rangeIndex, depth)
         val t = TriN.invIndex(tIndex, depth)
         //println(s"range index $rangeIndex, expanded $tIndex, triangle $t")
-        pw.println(s"range\t\t${t.octWkt}")
+        pw.println(s"range\t${t.index}\t${t.bitString}\t\t${t.octWkt}")
       }
       pw.close()
     }
