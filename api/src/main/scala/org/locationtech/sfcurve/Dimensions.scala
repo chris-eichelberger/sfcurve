@@ -15,6 +15,19 @@ object Dimensions {
       true
     }
 
+    def overlaps(that: Extent[T]): Boolean = {
+      // easy rejection
+      if (ev.lt(that.max, min)) return false
+      if (ev.gt(that.min, max)) return false
+
+      // endpoint rejection
+      if (ev.eq(that.max, min) && !(that.incMax && incMin)) return false
+      if (ev.eq(that.min, max) && !(that.incMin && incMax)) return false
+
+      // if you get this far, you overlap
+      true
+    }
+
     // ignores openness
     def isPoint: Boolean = ev.equiv(min, max)
   }

@@ -70,93 +70,119 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     octXMin <= octXBase.min && octXMax >= octXBase.max && ymin <= Y.min && ymax >= Y.max
   }
 
+  def octContainsPoint(octX: Double, y: Double): Boolean = {
+    // simple rejection
+    if (!octXBase.contains(octX)) return false
+    if (!Y.contains(y)) return false
+
+    val rawPY: Double = (y - y0) / (y1 - y0)
+    val pY: Double = if (isApexUp) 1.0 - rawPY else rawPY
+    val halfWidth: Double = octXBase.span * 0.5 * pY
+    val dist: Double = Math.abs(octX - octXBase.q2)
+
+    // TODO remove after debugging
+//    println(f"octContainsPoint($octX%1.3f, $y%1.3f):  |$octX%1.3f - ${octXBase.q2}%1.3f| = $dist%1.3f <= $halfWidth?  ${dist <= halfWidth}%s")
+//    println(f"  isApexUp?  $isApexUp%s")
+//    println(f"  rawPY $rawPY%1.3f")
+//    println(f"  pY $pY%1.3f")
+
+    dist <= halfWidth
+  }
+
   def octOverlaps(rectangle: Rectangle): Boolean = {
     // TODO:  remove after debugging
-//    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
-//    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
+    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
+    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
 
     // simple vertical elimination
     if (rectangle.y.max < Y.min) {
       // TODO:  remove after debugging
-//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
       return false
     }
     if (rectangle.y.min > Y.max) {
       // TODO:  remove after debugging
-//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
       return false
     }
 
     // simple horizontal elimination
     if (rectangle.x.max < octXBase.min) {
       // TODO:  remove after debugging
-//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
       return false
     }
     if (rectangle.x.min > octXBase.max) {
       // TODO:  remove after debugging
-//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
       return false
     }
 
-    // simple acceptance
-    for (tY <- Seq(Y.q0, Y.q1, Y.q2, Y.q3, Y.q4); tX <- Seq(octXBase.q0, octXBase.q1, octXBase.q2, octXBase.q3, octXBase.q4)) {
-      if (rectangle.x.contains(tX) && rectangle.y.contains(tY)) {
+    // simple acceptance:  rectangle contains triangle corners
+    if (rectangle.x.contains(octXApex) && rectangle.y.overlaps(Y)) {
+      // TODO:  remove after debugging
+      println(f"    Simple RcT acceptance of apex")
+      return true
+    }
+    if (rectangle.y.contains(yBase) && rectangle.x.contains(octX0)) {
+      // TODO:  remove after debugging
+      println(f"  Simple RcT acceptance of minX corner")
+      return true
+    }
+    if (rectangle.y.contains(yBase) && rectangle.x.contains(octX1)) {
+      // TODO:  remove after debugging
+      println(f"  Simple RcT acceptance of maxX corner")
+      return true
+    }
+
+    // simple acceptance:  triangle contains rectangle points
+    for (rX <- Seq(rectangle.x.q0, rectangle.x.q4); rY <- Seq(rectangle.y.q0, rectangle.y.q4)) {
+      if (octContainsPoint(rX, rY)) {
         // TODO:  remove after debugging
-//        println(f"    Simple acceptance tX $tX%1.3f on rectX (${rectangle.x.q0}%1.3f, ${rectangle.x.q4}%1.3f) and tY $tY%1.3f on rectY (${rectangle.y.q0}%1.3f, ${rectangle.y.q4}%1.3f)")
+        println(f"    Simple TcR")
         return true
       }
     }
 
-    //MPos || MPosInv
-    //MNeg || MNegInv
-
     // shoulder cases, both left and right
-    //val yProbe = min(Y.max, rectangle.y.max, max(rectangle.y.min, Y.min))
-    val yProbe: Double = {
-      if (rectangle.y.contains(Y.q2)) {
-        // TODO remove after debugging!
-//        println(f"    yProbe:  Using Y.q2 ${Y.q2}%1.3f contained within R")
-        Y.q2
-      } else {
-        if (rectangle.y.max <= Y.q2) {
-          // TODO remove after debugging!
-//          println(f"    yProbe:  Below Y mid ${Y.q2}, using r.y.max ${rectangle.y.max}")
-          rectangle.y.max
-        } else {
-          // TODO remove after debugging!
-//          println(f"    yProbe:  Above Y mid ${Y.q2}, using r.y.min ${rectangle.y.min}")
-          rectangle.y.min
-        }
-      }
-    }
-    require(yProbe >= Y.min && yProbe <= Y.max)
     val slope: Double = if (rectangle.x.max <= octXBase.q2 ^ isApexUp) MNeg else MPos
     val b: Double = if (isApexUp) Y.min else Y.max
     val x0: Double = if (rectangle.x.max <= octXBase.q2) octXBase.min else octXBase.max
-    val xProbe: Double =
+    val (xProbe: Double, yProbe: Double) =
       if (rectangle.x.contains(octXBase.q2)) {
         // TODO remove after debugging!
-//        println(f"    xProbe:  Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
-        octXBase.q2
+        println(f"    xProbe:  Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
+        println(f"      yProbe:  computed ${min(y1, rectangle.y.max, max(y0, rectangle.y.min))}")
+        (octXBase.q2, min(y1, rectangle.y.max, max(y0, rectangle.y.min)))
       } else {
         if (octXBase.q2 <= rectangle.x.min) {
           // TODO remove after debugging!
-//          println(f"    xProbe:  Right of oct mid (${octXBase.q2}), using r.x.min ${rectangle.x.min}%1.3f")
-          rectangle.x.min
+          println(f"    xProbe:  Right of oct mid (${octXBase.q2}), using r.x.min ${rectangle.x.min}%1.3f")
+          if (rectangle.y.contains(y0)) {
+            println(f"      yProbe:  Using y0")
+            (rectangle.x.min, y0)
+          } else {
+            throw new Exception("how do you get here #1?")
+          }
         } else {
           // TODO remove after debugging!
-//          println(f"    xProbe:  Left of oct mid (${octXBase.q2}), using r.x.max ${rectangle.x.max}%1.3f")
-          rectangle.x.max
+          println(f"    xProbe:  Left of oct mid (${octXBase.q2}), using r.x.max ${rectangle.x.max}%1.3f")
+          if (rectangle.y.contains(y0)) {
+            println(f"      yProbe:  Using y0")
+            (rectangle.x.min, y0)
+          } else {
+            throw new Exception("how do you get here #2?")
+          }
         }
       }
     require(xProbe >= octXBase.min && xProbe <= octXBase.max, "Invalid xProbe")
+    require(yProbe >= Y.min && yProbe <= Y.max)
     val yEq = slope * (xProbe - x0) + b
     val inside = if (isApexUp) yProbe <= yEq else yProbe >= yEq
 
     // TODO:  remove after debugging
-//    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
-//    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
+    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
+    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
 
     inside
   }
@@ -278,7 +304,7 @@ case class Triangle(index: Long, orientation: Int, bounds: TriBounds, depth: Int
     // find your children that intersect the query area
     val subs = childTriangles.filter(_.bounds.octOverlaps(octXMin, ymin, octXMax, ymax))
     if (subs.isEmpty) {
-      throw new Exception(s"Parent\n  $this\noverlaps geo bounds\n  ($octXMin, $ymin, $octXMax, $ymax)\nbut no child does:${childTriangles.map(_.toString).mkString("\n  ", "\n  ", "")}")
+      throw new Exception(s"Parent\n  $this\noverlaps oct bounds\n  ($octXMin, $ymin, $octXMax, $ymax)\nbut no child does:${childTriangles.map(_.toString).mkString("\n  ", "\n  ", "")}")
     }
 
     // recurse, and combine the results
@@ -461,6 +487,10 @@ object TriN {
     def q2: Double = 0.5 * (extent.min + extent.max)
     def q3: Double = 0.25 * extent.min + 0.75 * extent.max
     def q4: Double = extent.max
+
+    val Alpha = 1e-10
+    def insideMin: Double = q0 * Alpha + q1 * (1.0 - Alpha)
+    def insideMax: Double = q4 * Alpha + q3 * (1.0 - Alpha)
 
     def subQ1: Extent[Double] = Extent(q0, q1)
     def subQ2: Extent[Double] = Extent(q1, q2)
@@ -1061,7 +1091,7 @@ object TriTest extends App {
 
   def testOctOverlap(t: Triangle, octX: Double, y: Double, expectation: Boolean): Unit = {
     val r = Rectangle(Extent(octX, octX, incMin = true, incMax = true), Extent(y, y, incMin = true, incMax = true))
-    println(s"  test point $r, expects $expectation")
+    println(s"  test overlap expects $expectation\n    r:  $r\n    t:  $t\n    o:  ${t.bounds.octOverlaps(r)}")
     assert(t.bounds.octOverlaps(r) == expectation, "Triangle.bounds.octOverlaps(Rectangle) did not meet expectations.")
   }
 
@@ -1150,6 +1180,35 @@ object TriTest extends App {
     val numTriangles = ranges.map(range => range.upper - range.lower + 1).sum
     require(numTriangles == 8, s"Query for geo ($geoX0, $y0, $geoX1, $y1) expected 8 triangles, but got $numTriangles")
   }
+
+  // another real case that failed
+  /*
+    Processing sample 0:  POINT(-20.865941382897603 85.04820360224821), POINT(-19.865941382897603 86.04820360224821)...
+
+    Exception in thread "main" java.lang.Exception: Parent
+      Triangle(5522195474,1,TriBounds(-43.59375,Extent(-43.6376953125,-43.5498046875,true,false),Extent(84.990234375,85.078125,true,false),true),11)
+    overlaps oct bounds
+      (-43.94030126770893, 85.04820360224821, -43.617125100877224, 86.04820360224821)
+    but no child does:
+      Triangle(44177563792,10,TriBounds(-43.59375,Extent(-43.61572265625,-43.57177734375,true,false),Extent(84.990234375,85.0341796875,true,false),false),12)
+      Triangle(44177563794,11,TriBounds(-43.59375,Extent(-43.61572265625,-43.57177734375,true,false),Extent(85.0341796875,85.078125,true,false),true),12)
+      Triangle(44177563793,7,TriBounds(-43.57177734375,Extent(-43.59375,-43.5498046875,true,false),Extent(84.990234375,85.0341796875,true,false),true),12)
+      Triangle(44177563796,9,TriBounds(-43.61572265625,Extent(-43.6376953125,-43.59375,true,false),Extent(84.990234375,85.0341796875,true,false),true),12)
+   */
+  {
+    val t = TriN.invIndex(5522195474L, 11)
+    println("\n\n" + "="*80)
+    println(s"\nYATT:  $t")
+    val octXMin = -43.94030126770893
+    val yMin = 85.04820360224821
+    val octXMax = -43.617125100877224
+    val yMax = 86.04820360224821
+    val ranges = t.getRangesRecursively(octXMin, yMin, octXMax, yMax, 12)
+    println(s"ranges:  ${ranges.map(range => range.toString)}")
+  }
+
+  // TODO remove!
+  System.exit(-1)
 
   def poly(geoMinX: Double, minY: Double, geoMaxX: Double, maxY: Double): String =
     "POLYGON((" +
