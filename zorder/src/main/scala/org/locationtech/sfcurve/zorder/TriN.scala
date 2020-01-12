@@ -30,7 +30,9 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 import TriN._
 
-case class Rectangle(x: Extent[Double], y: Extent[Double])
+case class Rectangle(x: Extent[Double], y: Extent[Double]) {
+  def isPoint: Boolean = x.isPoint && y.isPoint
+}
 
 // although this will often have a degenerate Apex Geo X (when the shape is a proper triangle),
 // it can also describe a real rectangle (as for an octahedron face) as well as a trapezoid
@@ -94,6 +96,9 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
     val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
 
+    // point elimination
+    if (rectangle.isPoint) return octContainsPoint(rectangle.x.min, rectangle.y.min)
+
     // simple vertical elimination
     if (rectangle.y.max < Y.min) {
       // TODO:  remove after debugging
@@ -136,7 +141,7 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     }
 
     // simple acceptance:  triangle contains rectangle points
-    for (rX <- Seq(rectangle.x.q0, rectangle.x.q4); rY <- Seq(rectangle.y.q0, rectangle.y.q4)) {
+    for (rX <- Seq(rectangle.x.q0, rectangle.x.q2, rectangle.x.q4); rY <- Seq(rectangle.y.q0, rectangle.y.q2, rectangle.y.q4)) {
       if (octContainsPoint(rX, rY)) {
         // TODO:  remove after debugging
         println(f"    Simple TcR")
@@ -162,6 +167,9 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
             println(f"      yProbe:  Using y0")
             (rectangle.x.min, y0)
           } else {
+            // TODO remove after debugging!
+            println(f"    rX ${rectangle.x.toString}%s, tX ${octXBase.toString}%s")
+            println(f"    rY ${rectangle.y.toString}%s, tY ${Y.toString}%s")
             throw new Exception("how do you get here #1?")
           }
         } else {
