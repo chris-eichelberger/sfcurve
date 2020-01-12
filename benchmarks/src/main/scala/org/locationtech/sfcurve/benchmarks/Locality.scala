@@ -288,11 +288,11 @@ object Locality extends App {
         if ((n % 100) == 0) println(s"  Processing sample $n:  ${sample.a.wkt}, ${sample.b.wkt}...")
         n += 1L
         ps.print(s"${sample.a.wkt},${sample.b.wkt},${sample.dPlane()},${sample.dSphere()}")
-        distances.foreach {
-          case (curve, dists) =>
-            ps.print("," + dists.csvLine(sample, verbose = verbose))
-            ps.print("," + numQueryRanges(curve, sample))
-        }
+        curves.foreach { curve => {
+          val dists = distances(curve)
+          ps.print("," + dists.csvLine(sample, verbose = verbose))
+          ps.print("," + numQueryRanges(curve, sample))
+        }}
         ps.println()
       }
     }
@@ -428,6 +428,7 @@ object Locality extends App {
 
   for (sampler <- samplers) {
     Table(sampler, verbose = false, z2, h2, t2, t33, t36).exhaust(ps)
+    //Table(sampler, verbose = false, t2, t36).exhaust(ps)
   }
 
   ps.close()
