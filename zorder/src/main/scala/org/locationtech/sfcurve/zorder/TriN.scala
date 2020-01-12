@@ -72,31 +72,40 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
 
   def octOverlaps(rectangle: Rectangle): Boolean = {
     // TODO:  remove after debugging
-    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
-    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
+//    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
+//    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
 
     // simple vertical elimination
     if (rectangle.y.max < Y.min) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
+//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
       return false
     }
     if (rectangle.y.min > Y.max) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
+//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
       return false
     }
 
     // simple horizontal elimination
     if (rectangle.x.max < octXBase.min) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
+//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
       return false
     }
     if (rectangle.x.min > octXBase.max) {
       // TODO:  remove after debugging
-      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
+//      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
       return false
+    }
+
+    // simple acceptance
+    for (tY <- Seq(Y.q0, Y.q1, Y.q2, Y.q3, Y.q4); tX <- Seq(octXBase.q0, octXBase.q1, octXBase.q2, octXBase.q3, octXBase.q4)) {
+      if (rectangle.x.contains(tX) && rectangle.y.contains(tY)) {
+        // TODO:  remove after debugging
+//        println(f"    Simple acceptance tX $tX%1.3f on rectX (${rectangle.x.q0}%1.3f, ${rectangle.x.q4}%1.3f) and tY $tY%1.3f on rectY (${rectangle.y.q0}%1.3f, ${rectangle.y.q4}%1.3f)")
+        return true
+      }
     }
 
     //MPos || MPosInv
@@ -107,16 +116,16 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val yProbe: Double = {
       if (rectangle.y.contains(Y.q2)) {
         // TODO remove after debugging!
-        println(f"    yProbe:  Using Y.q2 ${Y.q2}%1.3f contained within R")
+//        println(f"    yProbe:  Using Y.q2 ${Y.q2}%1.3f contained within R")
         Y.q2
       } else {
         if (rectangle.y.max <= Y.q2) {
           // TODO remove after debugging!
-          println(f"    yProbe:  Below Y mid ${Y.q2}, using r.y.max ${rectangle.y.max}")
+//          println(f"    yProbe:  Below Y mid ${Y.q2}, using r.y.max ${rectangle.y.max}")
           rectangle.y.max
         } else {
           // TODO remove after debugging!
-          println(f"    yProbe:  Above Y mid ${Y.q2}, using r.y.min ${rectangle.y.min}")
+//          println(f"    yProbe:  Above Y mid ${Y.q2}, using r.y.min ${rectangle.y.min}")
           rectangle.y.min
         }
       }
@@ -128,16 +137,16 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val xProbe: Double =
       if (rectangle.x.contains(octXBase.q2)) {
         // TODO remove after debugging!
-        println(f"    xProbe:  Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
+//        println(f"    xProbe:  Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
         octXBase.q2
       } else {
         if (octXBase.q2 <= rectangle.x.min) {
           // TODO remove after debugging!
-          println(f"    xProbe:  Right of oct mid (${octXBase.q2}), using r.x.min ${rectangle.x.min}%1.3f")
+//          println(f"    xProbe:  Right of oct mid (${octXBase.q2}), using r.x.min ${rectangle.x.min}%1.3f")
           rectangle.x.min
         } else {
           // TODO remove after debugging!
-          println(f"    xProbe:  Left of oct mid (${octXBase.q2}), using r.x.max ${rectangle.x.max}%1.3f")
+//          println(f"    xProbe:  Left of oct mid (${octXBase.q2}), using r.x.max ${rectangle.x.max}%1.3f")
           rectangle.x.max
         }
       }
@@ -146,8 +155,8 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val inside = if (isApexUp) yProbe <= yEq else yProbe >= yEq
 
     // TODO:  remove after debugging
-    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
-    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
+//    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
+//    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
 
     inside
   }
@@ -1072,8 +1081,9 @@ object TriTest extends App {
     testOctOverlap(t, -73.0, 34.0, expectation = true)
   }
 
-  // additional triangle-overlaps tests for the apex-down case
+  // additional triangle-overlaps tests observed to fail during use
   {
+    val depth: Int = 8
     val point = Point(Degrees(-78.688256), Degrees(38.054444))
     val geoX0: Double = Math.floor(point.x.degrees)
     val geoX1: Double = Math.ceil(point.x.degrees)
@@ -1082,12 +1092,23 @@ object TriTest extends App {
     val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
     val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
     val r = Rectangle(Extent(octX0, octX1, incMin = true, incMax = true), Extent(y0, y1, incMin = true, incMax = true))
-    val t: Triangle = TriN.getTriangle(-79.0, 38.5, 8)
-    println(s"\n\nTest triangle...")
-    println(s"  triangle $t")
-    println(s"  is apex up?  ${TriN.isApexUp(t.orientation)}")
-    println(s"  rectangle $r")
-    assert(t.bounds.octOverlaps(r), "Triangle should have intersected rectangle, but did not")
+    val g2X0: Double = Math.min(TriN.octToGeoX(y0)(octX0), TriN.octToGeoX(y1)(octX0))
+    val g2X1: Double = Math.max(TriN.octToGeoX(y0)(octX1), TriN.octToGeoX(y1)(octX1))
+    ;
+    val points: Seq[Point] = Seq(
+      Point(Degrees(g2X1), Degrees(y0))
+    )
+    for (point <- points) {
+      println(s"\nTest triangle...")
+      println(s"  point")
+      println(s"    geo:  X ${point.x.degrees}, Y ${point.y.degrees}")
+      println(s"    oct:  X ${TriN.geoToOctX(point.y.degrees)(point.x.degrees)}, Y ${point.y.degrees}")
+      val t: Triangle = TriN.getTriangle(point.x.degrees, point.y.degrees, depth)
+      println(s"  triangle $t")
+      println(s"  is apex up?  ${TriN.isApexUp(t.orientation)}")
+      println(s"  rectangle $r")
+      assert(t.bounds.octOverlaps(r), "Triangle should have intersected rectangle, but did not")
+    }
   }
 
   // ensure that you can convert between compact and expanded index forms
@@ -1138,7 +1159,7 @@ object TriTest extends App {
   // (these are not unit tests so much as manual validation tests)
   try {
     // write out a query and the resulting ranges ask WKTs
-    for (depth <- Seq(6, 7, 8, 9)) {
+    for (depth <- Seq(8, 9, 12)) {
       val point = Point(Degrees(-78.688256), Degrees(38.054444))
       val geoX0: Double = Math.floor(point.x.degrees)
       val geoX1: Double = Math.ceil(point.x.degrees)
@@ -1161,66 +1182,66 @@ object TriTest extends App {
       pw.close()
     }
 
-//    pw = new PrintWriter(new FileWriter("test-points.txt"))
-//    pw.println("name\tgeo_wkt\toct_wkt")
-//    LocationsByName.foreach {
-//      case (name, LatLon(y, geoX)) =>
-//        val t = getInitialTriangle(geoX, y)
-//        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(y)(geoX)} $y)")
-//    }
-//    pw.close()
-//
-//    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
-//    pw.println("index\toct_wkt\tgeo_wkt")
-//    for (row <- 0 to 1; col <- 0 to 3) {
-//      val x0 = -180.0 + 90.0 * col
-//      val y0 = -90.0 + 90.0 * row
-//      val x1 = x0 + 90.0 - 1e-6
-//      val y1 = y0 + 90.0 - 1e-6
-//      val xMid = 0.5 * (x0 + x1)
-//      val yMid = 0.5 * (y0 + y1)
-//      val t = getInitialTriangle(xMid, yMid)
-//      pw.println(s"${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
-//    }
-//    pw.close()
-//
-//    pw = new PrintWriter(new FileWriter("test-index.txt"))
-//    pw.println("depth\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tarea_deg2\tarea_m2")
-//    val target: LatLon = LocationsByName("Eichelberger")
-//    (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
-//      case (x, y) =>
-//        val t = getTriangle(target.longitude, target.latitude, depth)
-//        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
-//        (x, y)
-//    })
-//    pw.close()
-//
-//    pw = new PrintWriter(new FileWriter("test-tiles.txt"))
-//    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tis_all_apex")
-//    for (t <- iterator(3)) {
-//      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${indexOctalString(t.index, t.depth)}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
-//    }
-//    pw.close()
-//
-//    pw = new PrintWriter(new FileWriter("test-progression.txt"))
-//    pw.println("index_from\tindex_to\toct_wkt\tgeo_wkt")
-//    for (t <- iterator(4).sliding(2, 1)) t match {
-//      case Seq(t0, t1) =>
-//        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}\t${octLineWkt(t0, t1)}")
-//    }
-//    pw.close()
-//
-//    // validate the 2D geo/oct coordinate translation
-//    pw = new PrintWriter(new FileWriter("test-oct2geo.txt"))
-//    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt")
-//    val target2: LatLon = LocationsByName("Eichelberger")
-//    (1 to 3).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
-//      case (x, y) =>
-//        val t = getTriangle(target2.longitude, target2.latitude, depth)
-//        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt)
-//        (x, y)
-//    })
-//    pw.close()
+    pw = new PrintWriter(new FileWriter("test-points.txt"))
+    pw.println("name\tgeo_wkt\toct_wkt")
+    LocationsByName.foreach {
+      case (name, LatLon(y, geoX)) =>
+        val t = getInitialTriangle(geoX, y)
+        pw.println(s"$name\tPOINT($geoX $y)\tPOINT(${geoToOctX(y)(geoX)} $y)")
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-triangles.txt"))
+    pw.println("index\toct_wkt\tgeo_wkt")
+    for (row <- 0 to 1; col <- 0 to 3) {
+      val x0 = -180.0 + 90.0 * col
+      val y0 = -90.0 + 90.0 * row
+      val x1 = x0 + 90.0 - 1e-6
+      val y1 = y0 + 90.0 - 1e-6
+      val xMid = 0.5 * (x0 + x1)
+      val yMid = 0.5 * (y0 + y1)
+      val t = getInitialTriangle(xMid, yMid)
+      pw.println(s"${t.bitString}\t${t.octWkt}\t${t.geoWkt}")
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-index.txt"))
+    pw.println("depth\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tarea_deg2\tarea_m2")
+    val target: LatLon = LocationsByName("Eichelberger")
+    (1 to 21).foldLeft((target.longitude, target.latitude))((acc, depth) => acc match {
+      case (x, y) =>
+        val t = getTriangle(target.longitude, target.latitude, depth)
+        pw.println(depth + "\t" + t.index + "\t" + t.bitString + "\t" + t.octWkt + "\t" + t.geoWkt + "\t" + t.bounds.areaSquareDegrees + "\t" + t.bounds.areaSquareMeters)
+        (x, y)
+    })
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-tiles.txt"))
+    pw.println("orientation\tindex_dec\tindex_bits\toct_wkt\tgeo_wkt\tis_all_apex")
+    for (t <- iterator(3)) {
+      pw.println(s"${OrientationNames(t.orientation)}\t${t.index}\t${indexOctalString(t.index, t.depth)}\t${t.octWkt}\t${t.geoWkt}\t${if (t.isAllApex) 1 else 0}")
+    }
+    pw.close()
+
+    pw = new PrintWriter(new FileWriter("test-progression.txt"))
+    pw.println("index_from\tindex_to\toct_wkt\tgeo_wkt")
+    for (t <- iterator(4).sliding(2, 1)) t match {
+      case Seq(t0, t1) =>
+        pw.println(s"${t0.index}\t${t1.index}\t${geoLineWkt(t0, t1)}\t${octLineWkt(t0, t1)}")
+    }
+    pw.close()
+
+    // validate the 2D geo/oct coordinate translation
+    pw = new PrintWriter(new FileWriter("test-oct2geo.txt"))
+    pw.println("depth\tindex_oct\toct_wkt\tgeo_wkt")
+    val target2: LatLon = LocationsByName("Eichelberger")
+    (1 to 3).foldLeft((target2.longitude, target2.latitude))((acc, depth) => acc match {
+      case (x, y) =>
+        val t = getTriangle(target2.longitude, target2.latitude, depth)
+        pw.println(depth + "\t" + indexOctalString(t.index, depth) + "\t" + t.octWkt + "\t" + t.geoWkt)
+        (x, y)
+    })
+    pw.close()
 
   } finally {
     pw.close()
