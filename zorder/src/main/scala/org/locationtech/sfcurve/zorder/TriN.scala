@@ -72,30 +72,30 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
 
   def octOverlaps(rectangle: Rectangle): Boolean = {
     // TODO:  remove after debugging
-    //val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
-    //val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
+    val r: String = f"R(X ${rectangle.x.min}%1.3f, ${rectangle.x.max}%1.3f Y ${rectangle.y.min}%1.3f, ${rectangle.y.max}%1.3f)"
+    val t: String = f"T(X ${octXBase.min}%1.3f, ${octXBase.max}%1.3f Y ${Y.min}%1.3f ${Y.max}%1.3f apex $octXApex%1.3f, up $isApexUp%s)"
 
     // simple vertical elimination
     if (rectangle.y.max < Y.min) {
       // TODO:  remove after debugging
-      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.max ${rectangle.y.max}%1.3f < Y.min ${Y.min}%1.3f")
       return false
     }
     if (rectangle.y.min > Y.max) {
       // TODO:  remove after debugging
-      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.y.min ${rectangle.y.min}%1.3f > Y.max ${Y.max}%1.3f")
       return false
     }
 
     // simple horizontal elimination
     if (rectangle.x.max < octXBase.min) {
       // TODO:  remove after debugging
-      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.max ${rectangle.x.max}%1.3f < octXBase.min ${octXBase.min}%1.3f")
       return false
     }
     if (rectangle.x.min > octXBase.max) {
       // TODO:  remove after debugging
-      //println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
+      println(f"    TriBounds.overlaps $r%s, $t%s :  r.x.min ${rectangle.x.min}%1.3f > octXBase.max ${octXBase.max}%1.3f")
       return false
     }
 
@@ -103,7 +103,24 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     //MNeg || MNegInv
 
     // shoulder cases, both left and right
-    val yProbe = min(Y.max, rectangle.y.max, max(rectangle.y.min, Y.min))
+    //val yProbe = min(Y.max, rectangle.y.max, max(rectangle.y.min, Y.min))
+    val yProbe: Double = {
+      if (rectangle.y.contains(Y.q2)) {
+        // TODO remove after debugging!
+        println(f"    yProbe:  Using Y.q2 ${Y.q2}%1.3f contained within R")
+        Y.q2
+      } else {
+        if (rectangle.y.max <= Y.q2) {
+          // TODO remove after debugging!
+          println(f"    yProbe:  Below Y mid ${Y.q2}, using r.y.max ${rectangle.y.max}")
+          rectangle.y.max
+        } else {
+          // TODO remove after debugging!
+          println(f"    yProbe:  Above Y mid ${Y.q2}, using r.y.min ${rectangle.y.min}")
+          rectangle.y.min
+        }
+      }
+    }
     require(yProbe >= Y.min && yProbe <= Y.max)
     val slope: Double = if (rectangle.x.max <= octXBase.q2 ^ isApexUp) MNeg else MPos
     val b: Double = if (isApexUp) Y.min else Y.max
@@ -111,16 +128,16 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val xProbe: Double =
       if (rectangle.x.contains(octXBase.q2)) {
         // TODO remove after debugging!
-        //println(f"    Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
+        println(f"    xProbe:  Using octXBase.q2 ${octXBase.q2}%1.3f contained within R")
         octXBase.q2
       } else {
         if (octXBase.q2 <= rectangle.x.min) {
           // TODO remove after debugging!
-          //println(f"    Right of oct mid, using r.x.min ${rectangle.x.min}%1.3f")
+          println(f"    xProbe:  Right of oct mid (${octXBase.q2}), using r.x.min ${rectangle.x.min}%1.3f")
           rectangle.x.min
         } else {
           // TODO remove after debugging!
-          //println(f"    Left of oct mid, using r.x.max ${rectangle.x.max}%1.3f")
+          println(f"    xProbe:  Left of oct mid (${octXBase.q2}), using r.x.max ${rectangle.x.max}%1.3f")
           rectangle.x.max
         }
       }
@@ -129,8 +146,8 @@ case class TriBounds(octXApex: Double, octXBase: Extent[Double], Y: Extent[Doubl
     val inside = if (isApexUp) yProbe <= yEq else yProbe >= yEq
 
     // TODO:  remove after debugging
-    //println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
-    //println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
+    println(f"    TriBounds.overlaps($r%s, $t%s:  yProbe $yProbe%1.3f ${if(isApexUp) "<=" else ">="} $slope%1.3f * ($xProbe%1.3f - $x0%1.3f) + $b%1.3f = $yEq%1.3f, inside $inside%s")
+    println(f"      Triangle X-mid ${octXBase.q2}%1.3f")
 
     inside
   }
@@ -1028,30 +1045,49 @@ object TriTest extends App {
     assert((trans0 != TransApex || trans1 != TransApex || trans2 != TransApex) ^ t)
   }
 
+  def testOctOverlap(t: Triangle, octX: Double, y: Double, expectation: Boolean): Unit = {
+    val r = Rectangle(Extent(octX, octX, incMin = true, incMax = true), Extent(y, y, incMin = true, incMax = true))
+    println(s"  test point $r, expects $expectation")
+    assert(t.bounds.octOverlaps(r) == expectation, "Triangle.bounds.octOverlaps(Rectangle) did not meet expectations.")
+  }
+
   // test the "triangle overlaps (oct) rectangle" functions
   {
     val target: LatLon = LocationsByName("Eichelberger")
     val t: Triangle = TriN.getTriangle(target.longitude, target.latitude, 4)
-    def testOverlap(x: Double, y: Double, expectation: Boolean): Unit = {
-      val r = Rectangle(Extent(x, x, incMin = true, incMax = true), Extent(y, y, incMin = true, incMax = true))
-      println(s"  test point $r, expects $expectation")
-      assert(t.bounds.octOverlaps(r) == expectation, "Triangle.bounds.octOverlaps(Rectangle) did not meet expectations.")
-    }
     println(s"Test triangle:  $t")
     // obviously wrong
-    testOverlap(-1.0, -1.0, expectation = false)
-    testOverlap(-1.0, 1.0, expectation = false)
-    testOverlap(1.0, -1.0, expectation = false)
-    testOverlap(1.0, 1.0, expectation = false)
+    testOctOverlap(t, -1.0, -1.0, expectation = false)
+    testOctOverlap(t, -1.0, 1.0, expectation = false)
+    testOctOverlap(t, 1.0, -1.0, expectation = false)
+    testOctOverlap(t, 1.0, 1.0, expectation = false)
     // less obviously wrong
-    testOverlap(-65.0, 44.9, expectation = false)
-    testOverlap(-73.0, 44.0, expectation = false)
+    testOctOverlap(t, -65.0, 44.9, expectation = false)
+    testOctOverlap(t, -73.0, 44.0, expectation = false)
     // obviously right
-    testOverlap(-67.5, 40.0, expectation = true)
-    testOverlap(-68.0, 40.0, expectation = true)
+    testOctOverlap(t, -67.5, 40.0, expectation = true)
+    testOctOverlap(t, -68.0, 40.0, expectation = true)
     // less obviously right
-    testOverlap(-62.0, 34.0, expectation = true)
-    testOverlap(-73.0, 34.0, expectation = true)
+    testOctOverlap(t, -62.0, 34.0, expectation = true)
+    testOctOverlap(t, -73.0, 34.0, expectation = true)
+  }
+
+  // additional triangle-overlaps tests for the apex-down case
+  {
+    val point = Point(Degrees(-78.688256), Degrees(38.054444))
+    val geoX0: Double = Math.floor(point.x.degrees)
+    val geoX1: Double = Math.ceil(point.x.degrees)
+    val y0: Double = Math.floor(point.y.degrees)
+    val y1: Double = Math.ceil(point.y.degrees)
+    val octX0: Double = Math.min(geoToOctX(y0)(geoX0), geoToOctX(y1)(geoX0))
+    val octX1: Double = Math.max(geoToOctX(y0)(geoX1), geoToOctX(y1)(geoX1))
+    val r = Rectangle(Extent(octX0, octX1, incMin = true, incMax = true), Extent(y0, y1, incMin = true, incMax = true))
+    val t: Triangle = TriN.getTriangle(-79.0, 38.5, 8)
+    println(s"\n\nTest triangle...")
+    println(s"  triangle $t")
+    println(s"  is apex up?  ${TriN.isApexUp(t.orientation)}")
+    println(s"  rectangle $r")
+    assert(t.bounds.octOverlaps(r), "Triangle should have intersected rectangle, but did not")
   }
 
   // ensure that you can convert between compact and expanded index forms
