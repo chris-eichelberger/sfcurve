@@ -57,8 +57,7 @@ class DimensionsSpec extends FunSpec with Matchers {
 
       val outerLong = Extent(0L, 100L)
       outerLong.contains(-1L) should equal(false)
-      outerLong.contains(0L) should equal(true)
-      outerLong.contains(50L) should equal(true)
+      (0 until 100).forall(i => outerLong.contains(i.toLong)) should equal(true)
       outerLong.contains(100L) should equal(false)
     }
   }
