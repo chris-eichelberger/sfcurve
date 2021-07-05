@@ -34,21 +34,32 @@ class RangeConsolidatorSpec extends FunSpec with Matchers {
 
   val rawRangesFour: Seq[(Long, Long)] = (16L to 31L).map(i => (i, i))
 
-  def consolidateRanges(ranges: Seq[(Long, Long)], name: String, maxGap: Long): Int = {
-    val netRanges = ranges.foldLeft(IndexRangeTree())((acc, range) =>
+  def consolidateRanges(ranges: Seq[(Long, Long)], name: String, maxGap: Long): Seq[GapMergedIndexRange] = {
+    val netRanges: Seq[GapMergedIndexRange] = ranges.foldLeft(IndexRangeTree())((acc, range) =>
       acc.add(GapMergedIndexRange(range.lower, range.upper, maxGap))).
       inOrderExtentIterator.toSeq
 
     println(s"\nNet ranges '$name' with gap $maxGap...")
     netRanges.foreach(println)
 
-    netRanges.size
+    netRanges
   }
 
   def consolidateRangesBothWays(ranges: Seq[(Long, Long)], name: String, maxGap: Long): Int = {
-    val forwards = consolidateRanges(ranges, name, maxGap)
-    val backwards = consolidateRanges(ranges.reverse, s"$name, Reverse", maxGap)
-    if (forwards == backwards) forwards else -1
+    val forwards: Seq[GapMergedIndexRange] = consolidateRanges(ranges, name, maxGap)
+    val backwards: Seq[GapMergedIndexRange] = consolidateRanges(ranges.reverse, s"$name, Reverse", maxGap)
+
+    // you must get the same number of consolidated ranges forwards as backwards
+    if (forwards.size != backwards.size) return -1
+
+    // the entries must all match
+    if (!forwards.zip(backwards).forall {
+      case (fIR, bIR) => (fIR.lower == bIR.lower) && (fIR.upper == bIR.upper)
+    }) return -1
+
+    // if you get this far, everything is fine;
+    // return the number of consolidated ranges so the caller can confirm the expected value
+    forwards.size
   }
 
   describe("in-memory range consolidator") {
