@@ -83,7 +83,7 @@ object IndexRange {
 /**
   *
   * @param bitsPrecision the number of bits to use PER DIMENSION to determine cardinality;
-  *                      curve_cardinality = num_dimensions * (1 << bitsPrecision)
+  *                      curve_cardinality_2d = 1 << (2 * bitsPrecision)
   */
 abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve {
   // we assume that the cardinality is specified in terms of the number of bits precision
@@ -114,13 +114,13 @@ abstract class SpaceFillingCurve2D(bitsPrecision: Int) extends SpaceFillingCurve
 /**
   *
   * @param bitsPrecision the number of bits to use PER DIMENSION to determine cardinality;
-  *                      curve_cardinality = num_dimensions * (1 << bitsPrecision)
+  *                      curve_cardinality_3d = 1 << (3 * bitsPrecision)
   */
 abstract class SpaceFillingCurve3D(bitsPrecision: Int) extends SpaceFillingCurve {
   // we assume that the cardinality is specified in terms of the number of bits precision
   val xDimension: Longitude = Longitude(1L << bitsPrecision)
   val yDimension: Latitude = Latitude(1L << bitsPrecision)
-  val zDimension: AltitudeInMeters = AltitudeInMeters(1L << bitsPrecision)
+  val zDimension: AltitudeInMeters = AltitudeInMeters(1L << bitsPrecision)  // this is an arbitrary 3rd dimension
   val children: Vector[Discretizor] = Vector(xDimension, yDimension, zDimension)
 
   @deprecated("use 'index' instead", "SFCurve 2.0")
