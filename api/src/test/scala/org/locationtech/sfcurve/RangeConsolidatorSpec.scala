@@ -2,8 +2,6 @@ package org.locationtech.sfcurve
 
 import org.scalatest.{FunSpec, Matchers}
 
-import GapMergedIndexRange._
-
 class RangeConsolidatorSpec extends FunSpec with Matchers {
   implicit def pairToRange(pair: (Long, Long)): IndexRange = IndexRange(pair._1, pair._2, contained = false)
 
