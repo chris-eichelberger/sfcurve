@@ -27,11 +27,20 @@ object HilbertCurve2DProvider {
   val RESOLUTION_PARAM = "hilbert.resolution"
 }
 
-class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bitsFromCardinality(resolution).toInt) with IdentityRangeConsolidator {
-  require(resolution > 0, "Resolution is negative; this probably means you tried to pass in a Long value that was too large")
-  require(resolution <= (Int.MaxValue >> 1), s"Resolution is too large; must be no more than ${Int.MaxValue >> 1}")
-  val bitsPerDimension: Int = Dimensions.bitsFromCardinality(resolution).toInt
-  val precision: Long = Dimensions.bitsFromCardinality(resolution)
+/**
+  * Represents a two-dimensional Hilbert curve.  This class is just a facade, with the
+  * Uzaygezen library doing all of the heavy lifting.
+  *
+  * We cannot assume that the ranges will come back ordered, which is why the
+  * IdentityRangeconsolidator trait is tacked on.
+  *
+  * NB:  Because of the parent contract, this will always be a square Hilbert curve.
+  *
+  * @param bitsPerDimension the number of bits resolution to use in EACH of the two dimensions
+  */
+class HilbertCurve2D(bitsPerDimension: Int) extends SpaceFillingCurve2D(bitsPerDimension) with IdentityRangeConsolidator {
+  require(bitsPerDimension > 0, "Bits/dimension is negative; this probably means you tried to pass in a Long value that was too large")
+  require(bitsPerDimension <= 31, s"Bits/dimension is too large; must be no more than 31")
   val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))
 
   val name: String = "Hilbert"
@@ -44,26 +53,26 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
 
     val p =
       Array[BitVector](
-        BitVectorFactories.OPTIMAL(resolution),
-        BitVectorFactories.OPTIMAL(resolution)
+        BitVectorFactories.OPTIMAL(bitsPerDimension),
+        BitVectorFactories.OPTIMAL(bitsPerDimension)
       )
 
     p(0).copyFrom(normX)
     p(1).copyFrom(normY)
 
-    val hilbert = BitVectorFactories.OPTIMAL.apply(resolution * 2)
+    val hilbert = BitVectorFactories.OPTIMAL.apply(bitsPerDimension * 2)
 
     chc.index(p,0,hilbert)
     hilbert.toLong
   }
 
   def unfold(index: Long): Vector[Long] = {
-    val h = BitVectorFactories.OPTIMAL.apply(resolution*2)
+    val h = BitVectorFactories.OPTIMAL.apply(bitsPerDimension*2)
     h.copyFrom(index)
     val p =
       Array[BitVector](
-        BitVectorFactories.OPTIMAL(resolution),
-        BitVectorFactories.OPTIMAL(resolution)
+        BitVectorFactories.OPTIMAL(bitsPerDimension),
+        BitVectorFactories.OPTIMAL(bitsPerDimension)
       )
 
     chc.indexInverse(h,p)
@@ -105,7 +114,7 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bit
       throw new Exception(s"Single-cell strip should not be possible:  long ($minNormalizedLongitude, $maxNormalizedLongitude), lat ($minNormalizedLatitude, $maxNormalizedLatitude)")
     }
 
-    val chc = new CompactHilbertCurve(Array[Int](precision.toInt, precision.toInt))
+    val chc = new CompactHilbertCurve(Array[Int](bitsPerDimension, bitsPerDimension))
     val region = new java.util.ArrayList[LongRange]()
 
     region.add(LongRange.of(minNormalizedLongitude,maxNormalizedLongitude))

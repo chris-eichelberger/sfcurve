@@ -17,6 +17,8 @@ import scala.util.Try
   * Assumes, because of the dependence on the Z2 object to do the real range-query identification,
   * that query ranges will already be returned in order without any additional post-processing.
   *
+  * NB:  Because of the parent contract, this will always be a square Hilbert curve.
+  *
   * @param    resolution     The number of cells in each dimension of the grid space that will be indexed.
   */
 class ZCurve2D(resolution: Int) extends SpaceFillingCurve2D(Dimensions.bitsFromCardinality(resolution).toInt)

@@ -10,6 +10,7 @@ package org.locationtech.sfcurve.hilbert
 
 import org.locationtech.sfcurve.Dimensions.{Latitude, Longitude}
 import org.locationtech.sfcurve.{GapMergedIndexRange, IndexRange, RangeComputeHints, SpaceFillingCurves}
+import org.scalatest.MustMatchers.convertToAnyMustWrapper
 import org.scalatest._
 
 class HilbertCurveSpec extends FunSpec with Matchers {
@@ -25,17 +26,17 @@ class HilbertCurveSpec extends FunSpec with Matchers {
   describe("A HilbertCurve implementation using UG lib") {
 
     it("translates (Double,Double) to Long and Long to (Double, Double)"){
-      val resolution = 16
-      val gridCells = math.pow(2, resolution)
+      val bitsPerDim: Int = 16  // 32 bits total in the curve
+      val gridCellsPerDim: Long = 1L << bitsPerDim
 
       for (atX <- Seq(-180.0, -179.9999, -10, 0, 10, 179.9999, 180); atY <- Seq(-90, -89.9999, -10, 0, 10, 89.9999, 90)) {
-        val sfc = new HilbertCurve2D(resolution)
+        val sfc = new HilbertCurve2D(bitsPerDim)  // 32 bits (4 giga cells) in the curve
         val index: Long = sfc.toIndex(atX, atY)
 
         val point = sfc.toPoint(index)
 
-        val dimLongitude = Longitude(gridCells.toLong)
-        val dimLatitude = Latitude(gridCells.toLong)
+        val dimLongitude = Longitude(gridCellsPerDim.toLong)
+        val dimLatitude = Latitude(gridCellsPerDim.toLong)
 
         dimLongitude.toExtent(dimLongitude.toBin(atX)).contains(point._1) should be(true)
         dimLatitude.toExtent(dimLatitude.toBin(atY)).contains(point._2) should be(true)
@@ -44,7 +45,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
 
     it("implements a range query"){
 
-      val sfc = new HilbertCurve2D(3)
+      val sfc = new HilbertCurve2D(3)  // 6 bits (64 cells) in the curve
 
       // any gaps of only one index cell will be merged automatically
       val hints = new RangeComputeHints
@@ -52,7 +53,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
 
       val range = sfc.toRanges(-178.123456, -86.398493, 179.3211113, 87.393483, Option(hints))
 
-      range should have length 3
+      range should have length 6
 
       // the last range is not wholly contained within the query region
       val (_, _, lastcontains) = range(2).tuple
@@ -62,7 +63,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
     it("Takes a Long value to a Point (Double, Double)"){
 
       val value = 0L
-      val sfc = new HilbertCurve2D(8)
+      val sfc = new HilbertCurve2D(8)  // 16 bits (65536 cells) in the curve
       val point: (Double, Double) = sfc.toPoint(value)
       print(point)     
 
@@ -70,14 +71,14 @@ class HilbertCurveSpec extends FunSpec with Matchers {
 
     it("Takes a Point (Double, Double) to a Long value"){
 
-      val sfc = new HilbertCurve2D(8)
+      val sfc = new HilbertCurve2D(8)  // 16 bits (65536 cells) in the curve
       val value: Long = sfc.toIndex(0.0,0.0)
       print(value)     
 
     }
 
     it("Emits query ranges in a consistent order") {
-      val sfc = new HilbertCurve2D(8)
+      val sfc = new HilbertCurve2D(8)  // 16 bits (65536 cells) in the curve
       val hints = new RangeComputeHints
       hints.put(GapMergedIndexRange.HintsKeyMapGap, 1L.asInstanceOf[AnyRef])
 
@@ -95,10 +96,7 @@ class HilbertCurveSpec extends FunSpec with Matchers {
       }
 
       // static query to validate (355 ranges)
-      validateQueryRanges(-178.0, 179.0, -86.0, 87.0)
-
-      // static query on a small area
-      //validateQueryRanges(-178.0, -178.0 + 1e-10, -86.0, 87)
+      validateQueryRanges(-178.0, 179.0, -86.0, 87.0) must be(true)
 
       // generator queries to validate
       for (trial <- 1 to 100) {
