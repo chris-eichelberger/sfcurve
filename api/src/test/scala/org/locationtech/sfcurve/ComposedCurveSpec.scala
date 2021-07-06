@@ -9,6 +9,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import scala.util.{Failure, Success, Try}
 
+import ImplicitCasts._
+
 class ComposedCurveSpec extends FunSpec with Matchers {
   val dtf = new SimpleDateFormat("yyyy-MM-dd HH:mm")
   val dt0: Date = dtf.parse("1988-02-12 11:45")
@@ -16,16 +18,17 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   val dt2: Date = dtf.parse("2001-04-23 12:30")
   val dt3: Date = dtf.parse("2019-02-12 08:11")
 
-  val BitsPerDimension: Int = 20
-  val X: Longitude = Longitude(BitsPerDimension)
-  val Y: Latitude = Latitude(BitsPerDimension)
-  val T: ExampleEra = ExampleEra(BitsPerDimension)
+  val BitsPerDimension: Int = 10
+  val CardinalityPerDimension: Long = 1L << BitsPerDimension.toLong
+  val X: Longitude = Longitude(CardinalityPerDimension)
+  val Y: Latitude = Latitude(CardinalityPerDimension)
+  val T: ExampleEra = ExampleEra(CardinalityPerDimension)
 
   val qTOpt: Option[Extent[_]] = Option(Extent(dt0, dt3))
   val qXOpt: Option[Extent[_]] = Option(Extent(-79.0, -78.0))
   val qYOpt: Option[Extent[_]] = Option(Extent(38.0, 39.0))
 
-  def R(children: Discretizor*): RowMajorCurve = RowMajorCurve(children:_*)
+  def R(children: Discretizor*): RowMajorSFC = RowMajorSFC(Vector(children:_*), 0)
 
   describe("???") {
     val Rtxy: SpaceFillingCurve = R(T, X, Y)
@@ -40,53 +43,24 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 
     it("must produce valid query ranges for different curves") {
       val ranges: List[IndexRange] = Rtxy.queryRanges(Seq(qTOpt, qXOpt, qYOpt)).toList
-      println(ranges.mkString("[", "; ", "]"))
+      println(RichQueryRanges(ranges).toString)
     }
   }
 }
 
-/**
-  * This is a naive implementation of a row-major curve for an arbitrary number of
-  * dimensions.  It's really only used for unit testing.
-  *
-  * @param subordinates the child discretizors (either Dimension or SpaceFillingCurve)
-  *                     from which to build this row-major curve
-  */
-case class RowMajorCurve(subordinates: Discretizor*) extends SpaceFillingCurve with InMemoryRangeConsolidator {
-  val children: Vector[Discretizor] = subordinates.toVector
-
-  val cardinalities: Vector[Long] = children.map(_.cardinality).foldRight(Vector(1L))((childCard, acc) => {
-    acc :+ (acc.last * childCard)
-  }).reverse.drop(1)
-
-  def fold(subordinates: Seq[Long]): Long = {
-    subordinates.zip(cardinalities).foldLeft(0L)((acc, pair) => pair match {
-      case (childCoord, childCardinality) => acc + childCoord * childCardinality
-    })
+object ImplicitCasts {
+  implicit class RichGMIR(gmir: GapMergedIndexRange) {
+    override def toString: String = if (gmir.lower == gmir.upper) gmir.lower.toString
+      else s"${gmir.lower.toString}-${gmir.upper.toString}(${gmir.size})"
   }
 
-  def unfold(index: Long): Vector[Long] = {
-    cardinalities.foldLeft((Vector[Long](), index))((accPair, childCard) => accPair match {
-      case (acc, indexLeft) => (
-        acc :+ (indexLeft / childCard),
-        indexLeft % childCard
-      )
-    })._1
-  }
+  implicit class RichQueryRanges(queryRanges: List[IndexRange]) {
+    require(queryRanges != null)
 
-  // this is a BAD implementation because it iterates over every possible cell in the query range
-  def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
-    val maxGap: Int = hints.map(_.get(GapMergedIndexRange.HintsKeyMapGap)).getOrElse(0).toString.toInt
+    val numCells: Long = queryRanges.map(_.size).sum
 
-    val querySeqs: Seq[Seq[_]] = lowerCorner.zip(upperCorner).map {
-      case (min, max) => (min to max).toSeq
+    override def toString: String = {
+      s"${queryRanges.size} entries, $numCells cells, ${queryRanges.map(qr => RichGMIR(qr.asInstanceOf[GapMergedIndexRange]).toString).mkString("[", ", ", "]")}"
     }
-
-    val rawRanges: Iterator[IndexRange] = CartesianProductIterable(querySeqs).iterator.map(seq => {
-      val coord: Seq[Long] = seq.map(_.asInstanceOf[Long])
-      val index = fold(coord)
-      GapMergedIndexRange(index, index, maxGap)
-    })
-    consolidateRanges(rawRanges, maxGap).toList
   }
 }

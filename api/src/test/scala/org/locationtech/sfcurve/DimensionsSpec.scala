@@ -142,47 +142,7 @@ class DimensionsSpec extends FunSpec with Matchers {
 
   describe("generic space-filling curve") {
     // dummy class for testing
-    case class R(children: Vector[Discretizor], maxGap: Long = 0) extends SpaceFillingCurve with InMemoryRangeConsolidator {
-      val ascendingCardinalities: Seq[Long] = children.map(_.cardinality).drop(1).scan(1L)(_ * _).reverse
-      require(ascendingCardinalities.size == children.size)
-
-      def fold(subordinates: Seq[Long]): Long = {
-        // extra checks, as we're in unit tests
-        subordinates.zip(children).foreach {
-          case (index, discretizor) =>
-            require(index >= 0)
-            require(index < discretizor.cardinality)
-        }
-        // do the arithmetic
-        subordinates.zip(ascendingCardinalities).map {
-          case (idx, factor) => idx * factor
-        }.sum
-      }
-
-      def unfold(index: Long): Vector[Long] = {
-        ascendingCardinalities.foldLeft((index, Vector[Long]()))((t, ascCard) => t match {
-          case (indexRemaining, subsSoFar) =>
-            val idx: Long = indexRemaining / ascCard
-            val rem: Long = indexRemaining % ascCard
-            (rem, subsSoFar :+ idx)
-        })._2
-      }
-
-      // this is a dumb implementation, because it's just for testing and needn't be efficient
-      def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
-        require(lowerCorner.size == arity)
-        require(upperCorner.size == arity)
-
-        val seqs: Seq[(Long, Long)] = lowerCorner.zip(upperCorner)
-        val rangesIn: Seq[Seq[Long]] = seqs.map {
-          case (a, b) => a to b
-        }
-        val coords: Iterator[Seq[Long]] = CartesianProductIterable(rangesIn).iterator.map(c => c.asInstanceOf[Seq[Long]])
-        val indexes: Seq[IndexRange] = coords.map(coord => fold(coord)).toSeq.map(i => CoveredRange(i, i))
-        val indexRanges = consolidateRanges(indexes.iterator, hints)
-        indexRanges.toSeq
-      }
-    }
+    def R(subs: Vector[Discretizor], maxGap: Long = 0): RowMajorSFC = RowMajorSFC(subs, maxGap)
 
     it("should work for simple 2D row-major form on a WGS84 plane") {
       val r = R(Vector(Longitude(8), Latitude(4)))
