@@ -43,16 +43,16 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
   * TANSTAAFL:  Computing the (inverse) index of a single point is relatively fast,
   * even in a composed curve.  The expense is incurred in computing the query ranges.
   * It's expensive because each child curve can return its own (lengthy) list of
-  * index ranges, and each of those ranges has to be run against the parent curve
-  * to identify the qualifying index ranges from the parent.  Reusing the composed-
+  * index ranges, and each combination of those ranges has to be run against the parent
+  * curve to identify the qualifying index ranges.  Reusing the composed-
   * curve example above -- R(t, Z(y, x)) -- think about computing the range query
   * for "the state of Virginia over May 7, 2021 to August 8, 2021"...
   *
-  * 1.  At the top level, the row-major curve passes the portion of the time query
+  * 1.  At the top level, the row-major curve passes the time portion of the query
   *     into the child that handles time.  Assume that it comes back with a single
   *     range, [1998-2001].  This is fast, being a single dimension.
   * 2.  The row-major curve passes the geographic portion of the query into the
-  *     Z-order curve.  Assume that it comes back with three (perfect) ranges:
+  *     Z-order curve.  Assume that it comes back with three (gapless) ranges:
   *     [156-158, 161-162, 173].  This is relatively fast for a Z-order curve.
   * 3.  The row-major curve that was originally given just two constraints -- a
   *     polygon and a time interval -- now has three separate queries to plan,
@@ -61,7 +61,7 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
   *     more than one dimension, you would expect multiple ranges to come back
   *     frequently, which would mean that the parent curve has a much larger
   *     number of ranges to plan than any of its children.  This will become slow
-  *     for all but the easy/simple cases such as this example.
+  *     for all but the easy/simple cases (such as this example).
   *
   */
 object Dimensions {
