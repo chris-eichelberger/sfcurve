@@ -31,9 +31,6 @@ object HilbertCurve2DProvider {
   * Represents a two-dimensional Hilbert curve.  This class is just a facade, with the
   * Uzaygezen library doing all of the heavy lifting.
   *
-  * We cannot assume that the ranges will come back ordered, which is why the
-  * IdentityRangeconsolidator trait is tacked on.
-  *
   * NB:  Because of the parent contract, this will always be a square Hilbert curve.
   *
   * @param bitsPerDimension the number of bits resolution to use in EACH of the two dimensions
