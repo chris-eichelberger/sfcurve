@@ -1,15 +1,12 @@
 package org.locationtech.sfcurve
 
 import org.locationtech.sfcurve.Dimensions._
-import org.locationtech.sfcurve.Utilities.CartesianProductIterable
+import org.locationtech.sfcurve.ImplicitCasts._
 import org.scalatest.MustMatchers.convertToAnyMustWrapper
 import org.scalatest.{FunSpec, Matchers}
 
 import java.text.SimpleDateFormat
 import java.util.Date
-import scala.util.{Failure, Success, Try}
-
-import ImplicitCasts._
 
 class ComposedCurveSpec extends FunSpec with Matchers {
   val dtf = new SimpleDateFormat("yyyy-MM-dd HH:mm")
@@ -18,11 +15,11 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   val dt2: Date = dtf.parse("2001-04-23 12:30")
   val dt3: Date = dtf.parse("2019-02-12 08:11")
 
-  val BitsPerDimension: Int = 10
+  val BitsPerDimension: Int = 5
   val CardinalityPerDimension: Long = 1L << BitsPerDimension.toLong
   val X: Longitude = Longitude(CardinalityPerDimension)
   val Y: Latitude = Latitude(CardinalityPerDimension)
-  val T: ExampleEra = ExampleEra(CardinalityPerDimension)
+  val T: DateDimension = ExampleEra(CardinalityPerDimension)
 
   val qTOpt: Option[Extent[_]] = Option(Extent(dt0, dt3))
   val qXOpt: Option[Extent[_]] = Option(Extent(-79.0, -78.0))
@@ -30,20 +27,43 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 
   def R(children: Discretizor*): RowMajorSFC = RowMajorSFC(Vector(children:_*), 0)
 
-  describe("???") {
+  describe("composed-curve variants using only R, x, y, and t") {
     val Rtxy: SpaceFillingCurve = R(T, X, Y)
-    val RZxy_t: SpaceFillingCurve = R(R(X, Y), T)
-    val RtZxy: SpaceFillingCurve = R(T, R(X, Y))
+    val Rxy_t: SpaceFillingCurve = R(R(X, Y), T)
+    val Rt_xy: SpaceFillingCurve = R(T, R(X, Y))
+    val Rxt_y: SpaceFillingCurve = R(R(X, T), Y)
 
     it("must have been able to instantiate the curves") {
-      RtZxy must not be(null)
-      RZxy_t must not be(null)
+      Rt_xy must not be(null)
+      Rxy_t must not be(null)
       Rtxy must not be(null)
+      Rxt_y must not be(null)
     }
 
     it("must produce valid query ranges for different curves") {
-      val ranges: List[IndexRange] = Rtxy.queryRanges(Seq(qTOpt, qXOpt, qYOpt)).toList
-      println(RichQueryRanges(ranges).toString)
+      val queryTXY: Seq[Option[Extent[_]]] = Seq(qTOpt, qXOpt, qYOpt)
+      val queryXYT: Seq[Option[Extent[_]]] = Seq(qXOpt, qYOpt, qTOpt)
+      val queryXTY: Seq[Option[Extent[_]]] = Seq(qXOpt, qTOpt, qYOpt)
+
+      def getRanges(name: String, curve: SpaceFillingCurve, query: Seq[Option[Extent[_]]]): List[IndexRange] = {
+        val ranges: List[IndexRange] = curve.queryRanges(query).toList
+        println(s"$name -> " + RichQueryRanges(ranges).toString)
+        ranges
+      }
+
+      val ranges_Rtxy: List[IndexRange] = getRanges("Rtxy", Rtxy, queryTXY)
+      ranges_Rtxy.size should be(22)
+
+      val ranges_Rt_xy: List[IndexRange] = getRanges("Rt_xy", Rt_xy, queryTXY)
+      ranges_Rt_xy.size should be(22)
+
+      val ranges_Rxt_y: List[IndexRange] = getRanges("Rxt_y", Rxt_y, queryXTY)
+      ranges_Rxt_y.size should be(22)
+
+      val ranges_Rxy_t: List[IndexRange] = getRanges("Rxy_t", Rxy_t, queryXYT)
+      ranges_Rxy_t.size should be(2)
+
+      1 should be(1)
     }
   }
 }

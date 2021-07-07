@@ -258,14 +258,21 @@ object Dimensions {
     }
   }
 
-  // defined over [1970-01-01, 2070-01-01)
-  case class ExampleEra(cardinality: Long) extends Dimension[Date] {
+  case class DateDimension(extent: Extent[Date], cardinality: Long) extends Dimension[Date] {
     val ev: DimensionLike[Date] = implicitly[DimensionLike[Date]]
-    val extent: Extent[Date] = Extent[Date](new Date(1970, 0, 1), new Date(2070, 0, 1), incMin = true, incMax = false)
     override def normalize(value: Date): Date = {
-      if (!extent.contains(value)) throw new Exception(s"Invalid date within the era:  $value")
+      if (!extent.contains(value)) throw new Exception(s"Invalid date within the date dimension:  $value outside $extent")
       value
     }
+  }
+  def DateDimension(minDate: Date, maxDate: Date, cardinality: Long): DateDimension =
+    DateDimension(Extent[Date](minDate, maxDate), cardinality)
+
+  // defined over [1970-01-01, 2070-01-01)
+  def ExampleEra(cardinality: Long): DateDimension = {
+    val d0 = new Date(70, 0, 1)
+    val d1 = new Date(170, 0, 1)
+    DateDimension(d0, d1, cardinality)
   }
 
   case class Cell(extents: Vector[Extent[_]] = Vector()) {

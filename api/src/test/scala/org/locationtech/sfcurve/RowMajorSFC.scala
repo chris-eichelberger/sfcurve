@@ -43,14 +43,13 @@ case class RowMajorSFC(children: Vector[Discretizor], maxGap: Long = 0) extends 
 
   // this is a BAD implementation, because it's just for testing and needn't be efficient
   def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
-    require(lowerCorner.size == arity)
-    require(upperCorner.size == arity)
+    require(lowerCorner.size == upperCorner.size)
 
     val seqs: Seq[(Long, Long)] = lowerCorner.zip(upperCorner)
     val rangesIn: Seq[Seq[Long]] = seqs.map {
       case (a, b) => a to b
     }
-    val coords: Iterator[Seq[Long]] = CartesianProductIterable(rangesIn).iterator.map(c => c.asInstanceOf[Seq[Long]])
+    val coords: List[Seq[Long]] = CartesianProductIterable(rangesIn).iterator.map(c => c.asInstanceOf[Seq[Long]]).toList
     val indexes: Seq[IndexRange] = coords.map(coord => fold(coord)).toSeq.map(i => CoveredRange(i, i))
     val indexRanges = consolidateRanges(indexes.iterator, maxGap)
     indexRanges.toSeq

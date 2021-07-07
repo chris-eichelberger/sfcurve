@@ -16,8 +16,8 @@ class DimensionsSpec extends FunSpec with Matchers {
   val dt2: Date = dtf.parse("2001-04-23 12:30")
   val dt3: Date = dtf.parse("2019-02-12 08:11")
 
-  describe("date ordering") {
-    it("should order dates properly") {
+  describe("dates") {
+    it("should order properly") {
       dateOrdering.equiv(dt3, dt3) should equal(true)
       dateOrdering.equiv(dt2, dt3) should equal(false)
       dateOrdering.equiv(dt3, dt2) should equal(false)
@@ -37,6 +37,22 @@ class DimensionsSpec extends FunSpec with Matchers {
       dateOrdering.lteq(dt0, dt3) should equal(true)
       dateOrdering.lteq(dt3, dt3) should equal(true)
       dateOrdering.lteq(dt3, dt0) should equal(false)
+    }
+
+    it("should discretize correctly") {
+      val T = DateDimension(dt0, dt3, 1L << 16)
+
+      def testDateTime(dt: Date): Boolean = {
+        val i = T.index(Seq(dt))
+        val c = T.inverseIndex(i)
+
+        println(s"dates test discretizing:  $dt -> index $i -> cell $c")
+
+        c.extents.head.contains(dt)
+      }
+
+      testDateTime(dt1) should be(true)
+      testDateTime(dt2) should be(true)
     }
   }
 
