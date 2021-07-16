@@ -69,6 +69,11 @@ lazy val hilbert: Project =
     .settings(commonSettings: _*)
     .dependsOn(api)
 
+lazy val composition: Project =
+  Project("composition", file("composition"))
+    .settings(commonSettings: _*)
+    .dependsOn(api, zorder, hilbert)
+
 
 lazy val benchmarks: Project =
   Project("benchmarks", file("benchmarks"))
