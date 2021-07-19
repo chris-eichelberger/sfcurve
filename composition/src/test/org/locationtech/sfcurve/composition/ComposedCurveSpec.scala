@@ -17,6 +17,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   val dt1: Date = dtf.parse("1998-08-28 22:15")
   val dt2: Date = dtf.parse("2001-04-23 12:30")
   val dt3: Date = dtf.parse("2019-02-12 08:11")
+  val dt4: Date = dtf.parse("1988-02-22 11:45")
 
   /*
   Three-dimensional curves will come in two shapes:
@@ -37,7 +38,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
    */
   
   // for curve form 1:  C(a, a, a)
-  val BitsPerDimensionA: Int = 8  // must be divisible by 4
+  val BitsPerDimensionA: Int = 12  // must be divisible by 4
   val CardinalityPerDimensionA: Long = 1L << BitsPerDimensionA
   val XA: Longitude = Longitude(CardinalityPerDimensionA)
   val YA: Latitude = Latitude(CardinalityPerDimensionA)
@@ -56,12 +57,12 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   val LargeTB: DateDimension = ExampleEra(LargeCardinalityPerDimensionB)
 
   // 38.029925749354696, -78.47741019445668 is approximately Charlottesville City Hall
-  val qTOpt: Option[Extent[_]] = Option(Extent(dt0, dt3))
-  val dx: Double = 0.5
+  val qTOpt: Option[Extent[_]] = Option(Extent(dt0, dt4))
+  val dx: Double = 0.05
   val xMid: Double = -78.52690829423837
   val xMin: Double = xMid - dx
   val xMax: Double = xMid + dx
-  val dy: Double = 0.05
+  val dy: Double = dx
   val yMid: Double = 38.029925749354696
   val yMin: Double = yMid - dy
   val yMax: Double = yMid + dy
@@ -70,9 +71,36 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 
   def R(children: Discretizor*): RowMajorSFC = RowMajorSFC(Vector(children:_*))
 
-  def getRanges(name: String, curve: SpaceFillingCurve, query: Seq[Option[Extent[_]]]): List[IndexRange] = {
+  def getRanges(name: String, curve: SpaceFillingCurve, query: Seq[Option[Extent[_]]], optNumEntries: Option[Long] = None, optNumCells: Option[Long] = None, printCellDetails: Boolean = false): List[IndexRange] = {
     val ranges: List[IndexRange] = curve.queryRanges(query).toList
     println(s"$name -> " + RichQueryRanges(ranges).toString)
+
+    if (printCellDetails) {
+      for (ir <- ranges.take(ImplicitCasts.MaxRanges)) {
+        print(s"  Index range:  ${RichIR(ir).toString}")
+        if (ir.size == 1) {
+          val cell = curve.inverseIndex(ir.lower)
+          println(s" -> $cell")
+        } else {
+          println(":")
+          for (idx <- (ir.lower to ir.upper)) {
+            val cell = curve.inverseIndex(idx)
+            println(s"    $idx -> $cell")
+          }
+        }
+      }
+    }
+
+    optNumEntries match {
+      case Some(numEntries) => ranges.size must be(numEntries)
+      case None =>
+    }
+
+    optNumCells match {
+      case Some(numCells) => ranges.numCells must be(numCells)
+      case None =>
+    }
+
     ranges
   }
 
@@ -93,9 +121,14 @@ class ComposedCurveSpec extends FunSpec with Matchers {
       val queryTXY: Seq[Option[Extent[_]]] = Seq(qTOpt, qXOpt, qYOpt)
       val queryXYT: Seq[Option[Extent[_]]] = Seq(qXOpt, qYOpt, qTOpt)
 
-      getRanges("Rtxy", Rtxy, queryTXY).size should be(160)
-      getRanges("Rt_xy", Rt_xy, queryTXY).size should be(2542)
-      getRanges("Rxy_t", Rxy_t, queryXYT).size should be(2)
+      // form A uses bigger cells, so there should be fewer
+      // (but all A-form curves should have the same number of cells)
+      getRanges("Rtxy", Rtxy, queryTXY, Option(9), Option(27))
+
+      // form B uses smaller cells, so there should be more
+      // (but all B-form curves should have the same number of cells)
+      getRanges("Rt_xy", Rt_xy, queryTXY, Some(73), Some(73))
+      getRanges("Rxy_t", Rxy_t, queryXYT, Some(1), Some(73))
     }
   }
 
@@ -125,31 +158,50 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   }
 
   describe("composed curves using R, Z, H, x, y, and t") {
+    val Ztxy: SpaceFillingCurve = Z(TA, XA, YA)
     val RtZxy: SpaceFillingCurve = R(LargeTB, Z(XB, YB))
     val RtHxy: SpaceFillingCurve = R(LargeTB, H(XB, YB))
-    val Ztxy: SpaceFillingCurve = Z(TA, XA, YA)
-    val Zxy: SpaceFillingCurve = Z(XB, YB)
     val HtZxy: SpaceFillingCurve = H(LargeTB, Z(XB, YB))
+    val RZxy_t: SpaceFillingCurve = R(Z(XB, YB), LargeTB)
+    val RHxy_t: SpaceFillingCurve = R(H(XB, YB), LargeTB)
+    val HZxy_t: SpaceFillingCurve = H(Z(XB, YB), LargeTB)
 
     it("must be able to instantiate the curves") {
       RtZxy must not be null
       RtHxy must not be null
       Ztxy must not be null
-      Zxy must not be null
       HtZxy must not be null
+      RZxy_t must not be null
+      RHxy_t must not be null
+      HZxy_t must not be null
     }
 
     it("must produce valid query ranges for different curves") {
-      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(2542)
-      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(2542)
-      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(80)
-      getRanges("Zxy", Zxy, Seq(qXOpt, qYOpt))
-      getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt))
+      // background
+      getRanges(s"t:$LargeCardinalityPerDimensionB", R(LargeTB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"Zxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", Z(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
+      getRanges(s"Hxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", H(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
+      getRanges(s"t$CardinalityPerDimensionB", R(TB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"x$CardinalityPerDimensionB", R(XB), Seq(qXOpt), None, None, printCellDetails = true)
+      getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
+
+      // form A should have fewer cells
+      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt), Some(13), Some(27))
+
+      // all B-form curves should have similar numbers of cells
+      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(73), Some(73))
+      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt), Some(73), Some(73))
+      getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(73), Some(73))
+      getRanges("RZxy_t", RZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(1), Some(73))
+      getRanges("RHxy_t", RHxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(1), Some(73))
+      getRanges("HZxy_t", HZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(73), Some(73))
     }
   }
 }
 
 object ImplicitCasts {
+  val MaxRanges: Int = 15
+
   implicit class RichIR(ir: IndexRange) {
     override def toString: String = if (ir.lower == ir.upper) ir.lower.toString
       else s"${ir.lower.toString}-${ir.upper.toString}(${ir.size})"
@@ -161,12 +213,12 @@ object ImplicitCasts {
     val numCells: Long = queryRanges.map(_.size).sum
 
     override def toString: String = {
-      if (queryRanges.size < 100) {
+      if (queryRanges.size <= MaxRanges) {
         // exhaustive
         s"${queryRanges.size} entries, $numCells cells, ${queryRanges.map(qr => RichIR(qr).toString).mkString("[", ", ", "]")}"
       } else {
         // summary only
-        s"${queryRanges.size} entries, $numCells cells, [... elided...]"
+        s"${queryRanges.size} entries, $numCells cells, [${queryRanges.take(MaxRanges).map(qr => RichIR(qr).toString).mkString(", ")}, ... elided...]"
       }
     }
   }
