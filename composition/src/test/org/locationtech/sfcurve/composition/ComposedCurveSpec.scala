@@ -1,10 +1,10 @@
 package org.locationtech.sfcurve.composition
 
 import org.locationtech.sfcurve.Dimensions._
-import org.locationtech.sfcurve.{Dimensions, GapMergedIndexRange, IndexRange, RowMajorSFC}
 import org.locationtech.sfcurve.composition.ImplicitCasts._
 import org.locationtech.sfcurve.hilbert.HilbertCurve2D
-import org.locationtech.sfcurve.zorder.{ZCurve2D, ZCurve3D, ZOrderSFCProvider}
+import org.locationtech.sfcurve.zorder.{ZCurve2D, ZCurve3D}
+import org.locationtech.sfcurve.{Dimensions, IndexRange, RowMajorSFC}
 import org.scalatest.MustMatchers.convertToAnyMustWrapper
 import org.scalatest.{FunSpec, Matchers}
 
@@ -37,7 +37,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
    */
   
   // for curve form 1:  C(a, a, a)
-  val BitsPerDimensionA: Int = 12
+  val BitsPerDimensionA: Int = 8  // must be divisible by 4
   val CardinalityPerDimensionA: Long = 1L << BitsPerDimensionA
   val XA: Longitude = Longitude(CardinalityPerDimensionA)
   val YA: Latitude = Latitude(CardinalityPerDimensionA)
@@ -68,7 +68,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   val qXOpt: Option[Extent[_]] = Option(Extent(xMin, xMax))
   val qYOpt: Option[Extent[_]] = Option(Extent(yMin, yMax))
 
-  def R(children: Discretizor*): RowMajorSFC = RowMajorSFC(Vector(children:_*), 0)
+  def R(children: Discretizor*): RowMajorSFC = RowMajorSFC(Vector(children:_*))
 
   def getRanges(name: String, curve: SpaceFillingCurve, query: Seq[Option[Extent[_]]]): List[IndexRange] = {
     val ranges: List[IndexRange] = curve.queryRanges(query).toList
@@ -83,20 +83,19 @@ class ComposedCurveSpec extends FunSpec with Matchers {
     val Rxt_y: SpaceFillingCurve = R(R(XB, TB), LargeYB)
 
     it("must have been able to instantiate the curves") {
-      Rt_xy must not be(null)
-      Rxy_t must not be(null)
-      Rtxy must not be(null)
-      Rxt_y must not be(null)
+      Rt_xy must not be null
+      Rxy_t must not be null
+      Rtxy must not be null
+      Rxt_y must not be null
     }
 
     it("must produce valid query ranges for different curves") {
       val queryTXY: Seq[Option[Extent[_]]] = Seq(qTOpt, qXOpt, qYOpt)
       val queryXYT: Seq[Option[Extent[_]]] = Seq(qXOpt, qYOpt, qTOpt)
-      val queryXTY: Seq[Option[Extent[_]]] = Seq(qXOpt, qTOpt, qYOpt)
 
-      getRanges("Rtxy", Rtxy, queryTXY).size should be(3)
-      getRanges("Rt_xy", Rt_xy, queryTXY).size should be(21)
-      getRanges("Rxy_t", Rxy_t, queryXYT).size should be(1)
+      getRanges("Rtxy", Rtxy, queryTXY).size should be(160)
+      getRanges("Rt_xy", Rt_xy, queryTXY).size should be(2542)
+      getRanges("Rxy_t", Rxy_t, queryXYT).size should be(2)
     }
   }
 
@@ -133,17 +132,17 @@ class ComposedCurveSpec extends FunSpec with Matchers {
     val HtZxy: SpaceFillingCurve = H(LargeTB, Z(XB, YB))
 
     it("must be able to instantiate the curves") {
-      RtZxy must not be(null)
-      RtHxy must not be(null)
-      Ztxy must not be(null)
-      Zxy must not be(null)
-      HtZxy must not be(null)
+      RtZxy must not be null
+      RtHxy must not be null
+      Ztxy must not be null
+      Zxy must not be null
+      HtZxy must not be null
     }
 
     it("must produce valid query ranges for different curves") {
-      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(21)
-      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(21)
-      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(2)
+      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(2542)
+      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(2542)
+      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt)).size must be(80)
       getRanges("Zxy", Zxy, Seq(qXOpt, qYOpt))
       getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt))
     }
