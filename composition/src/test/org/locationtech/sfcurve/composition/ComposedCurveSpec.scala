@@ -17,7 +17,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
   val dt1: Date = dtf.parse("1998-08-28 22:15")
   val dt2: Date = dtf.parse("2001-04-23 12:30")
   val dt3: Date = dtf.parse("2019-02-12 08:11")
-  val dt4: Date = dtf.parse("1988-02-22 11:45")
+  val dt4: Date = dtf.parse("1988-02-15 11:45")
 
   /*
   Three-dimensional curves will come in two shapes:
@@ -58,7 +58,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 
   // 38.029925749354696, -78.47741019445668 is approximately Charlottesville City Hall
   val qTOpt: Option[Extent[_]] = Option(Extent(dt0, dt4))
-  val dx: Double = 0.05
+  val dx: Double = 0.1
   val xMid: Double = -78.52690829423837
   val xMin: Double = xMid - dx
   val xMax: Double = xMid + dx
@@ -109,26 +109,39 @@ class ComposedCurveSpec extends FunSpec with Matchers {
     val Rxy_t: SpaceFillingCurve = R(R(XB, YB), LargeTB)
     val Rt_xy: SpaceFillingCurve = R(LargeTB, R(XB, YB))
     val Rxt_y: SpaceFillingCurve = R(R(XB, TB), LargeYB)
+    val Rty_x: SpaceFillingCurve = R(R(TB, YB), LargeXB)
 
     it("must have been able to instantiate the curves") {
       Rt_xy must not be null
       Rxy_t must not be null
       Rtxy must not be null
       Rxt_y must not be null
+      Rty_x must not be null
     }
 
     it("must produce valid query ranges for different curves") {
       val queryTXY: Seq[Option[Extent[_]]] = Seq(qTOpt, qXOpt, qYOpt)
       val queryXYT: Seq[Option[Extent[_]]] = Seq(qXOpt, qYOpt, qTOpt)
 
+      // background
+      getRanges(s"x$CardinalityPerDimensionB", R(XB), Seq(qXOpt), None, None, printCellDetails = true)
+      getRanges(s"x:$LargeCardinalityPerDimensionB", R(LargeXB), Seq(qXOpt), None, None, printCellDetails = true)
+      getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
+      getRanges(s"y:$LargeCardinalityPerDimensionB", R(LargeYB), Seq(qYOpt), None, None, printCellDetails = true)
+      getRanges(s"t$CardinalityPerDimensionB", R(TB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"t:$LargeCardinalityPerDimensionB", R(LargeTB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"Rxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
+      getRanges(s"Rxt:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(XB, TB), Seq(qXOpt, qTOpt), None, None, printCellDetails = true)
+      getRanges(s"Rty:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(TB, YB), Seq(qTOpt, qYOpt), None, None, printCellDetails = true)
+
       // form A uses bigger cells, so there should be fewer
       // (but all A-form curves should have the same number of cells)
-      getRanges("Rtxy", Rtxy, queryTXY, Option(9), Option(27))
+      getRanges("Rtxy", Rtxy, queryTXY, Option(6), Option(30))
 
       // form B uses smaller cells, so there should be more
       // (but all B-form curves should have the same number of cells)
-      getRanges("Rt_xy", Rt_xy, queryTXY, Some(73), Some(73))
-      getRanges("Rxy_t", Rxy_t, queryXYT, Some(1), Some(73))
+      getRanges("Rt_xy", Rt_xy, queryTXY, Some(22), Some(44))
+      getRanges("Rxy_t", Rxy_t, queryXYT, Some(2), Some(44))
     }
   }
 
@@ -186,15 +199,15 @@ class ComposedCurveSpec extends FunSpec with Matchers {
       getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
 
       // form A should have fewer cells
-      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt), Some(13), Some(27))
+      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt), Some(28), Some(30))
 
       // all B-form curves should have similar numbers of cells
-      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(73), Some(73))
-      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt), Some(73), Some(73))
-      getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(73), Some(73))
-      getRanges("RZxy_t", RZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(1), Some(73))
-      getRanges("RHxy_t", RHxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(1), Some(73))
-      getRanges("HZxy_t", HZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(73), Some(73))
+      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(44), Some(44))
+      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt), Some(22), Some(44))
+      getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(44), Some(44))
+      getRanges("RZxy_t", RZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(2), Some(44))
+      getRanges("RHxy_t", RHxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(2), Some(44))
+      getRanges("HZxy_t", HZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(44), Some(44))
     }
   }
 }
