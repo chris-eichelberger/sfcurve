@@ -218,6 +218,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
       val dim2: Discretizor = new DoubleDimension(0.0, 1.0, 2)
       val dim4: Discretizor = new DoubleDimension(0.0, 1.0, 4)
       val dim8: Discretizor = new DoubleDimension(0.0, 1.0, 8)
+      val dim16: Discretizor = new DoubleDimension(0.0, 1.0, 16)
 
       // pure 2D squares
 //      CurveTextWriter.writeText(R(dim8, dim8))
@@ -230,9 +231,9 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 //      CurveTextWriter.writeText(R(dim4, dim4, dim4))
 //      CurveTextWriter.writeText(Z(dim4, dim4, dim4))
 
-      // hybrid 3D cubes (again, without Hilbert at top level)
-      val curve = R(dim8, Z(dim4, dim4))
-      CurveTextWriter.writeText(curve)
+      // hybrid 3D cubes
+      CurveTextWriter.writeText(H(dim16, R(dim4, dim4)))
+      //CurveTextWriter.writeText(R(dim16, H(dim4, dim4)))
       //CurveTextWriter.writeText(R(dim8, Z(dim4, dim4)))
     }
   }

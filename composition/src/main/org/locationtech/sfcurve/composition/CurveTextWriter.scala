@@ -1,6 +1,6 @@
 package org.locationtech.sfcurve.composition
 
-import org.locationtech.sfcurve.Dimensions.{Discretizor, SpaceFillingCurve}
+import org.locationtech.sfcurve.Dimensions.{Dimension, Discretizor, SpaceFillingCurve}
 import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 
 /**
@@ -34,12 +34,41 @@ object CurveTextWriter {
     write(HR)
   }
 
+  /**
+   * This HOF is needed because the SFC contract is only meant to recurse for raw values,
+   * not for discretized indexes.  That is, the SFC's `fold` expects a list that contains
+   * one Long per *child*, whereas `index` expects a list that contains one value per *dimension*.
+   *
+   * This is an artificial case that should only be relevant inside unit tests, which is why
+   * this function isn't simply included into the SFC class itself.
+   *
+   * @param discretizor the curve or dimension
+   * @param coord the list of per-dimension discretized values
+   * @return the `fold`ed result of using these per-dimension values up through the curve
+   */
+  def index(discretizor: Discretizor)(coord: Seq[Long]): Long = {
+    discretizor match {
+      case curve: SpaceFillingCurve =>
+        val toFold: Seq[Long] = curve.children.foldLeft(coord, Seq[Long]())((acc, child) => acc match {
+          case (coordRemainder, toFoldSoFar) =>
+            (
+              coordRemainder.drop(child.arity),
+              toFoldSoFar :+ index(child)(coordRemainder)
+            )
+        })._2
+        curve.fold(toFold)
+      case dim: Dimension[_] =>
+        coord.head
+    }
+  }
+
   // the first dimension iterates fastest; the last dimension iterates slowest
   def writeText(curve: SpaceFillingCurve, write: OutputSink = println): Unit = {
     val leaves: Vector[Discretizor] = curve.leaves
 
     write(s"Writing text representation of curve:  $curve")
     write(s"Leaves:  ${leaves.map(_.toString).mkString("; ")}")
+    write(s"Cardinality:  ${curve.cardinality}")
 
     // some curves are just too big to print
     require(curve.cardinality <= 8192)
@@ -51,9 +80,10 @@ object CurveTextWriter {
 
     val cellWidth: Int = Math.ceil(Math.log10(curve.cardinality)).toInt
 
-    val higherCardinalities: Vector[Vector[Long]] = curve.children.drop(2).map(child => (0 until child.cardinality.toInt).map(_.toLong).toVector)
+    val higherCardinalities: Vector[Vector[Long]] = leaves.drop(2).map(child => (0 until child.cardinality.toInt).map(_.toLong).toVector)
+    write(s"Higher cardinalities:  ${higherCardinalities.map(_.toString).mkString("[", ", ", "]")}")
     CartesianProductIterable(higherCardinalities).iterator.foreach { higherCoord =>
-      writeGrid(write, higherCoord.asInstanceOf[Seq[Long]], width, height, curve.fold, cellWidth)
+      writeGrid(write, higherCoord.asInstanceOf[Seq[Long]], width, height, index(curve), cellWidth)
     }
   }
 }
