@@ -105,46 +105,46 @@ class ComposedCurveSpec extends FunSpec with Matchers {
     ranges
   }
 
-//  describe("composed-curve variants using only R, x, y, and t") {
-//    val Rtxy: SpaceFillingCurve = R(TA, XA, YA)
-//    val Rxy_t: SpaceFillingCurve = R(R(XB, YB), LargeTB)
-//    val Rt_xy: SpaceFillingCurve = R(LargeTB, R(XB, YB))
-//    val Rxt_y: SpaceFillingCurve = R(R(XB, TB), LargeYB)
-//    val Rty_x: SpaceFillingCurve = R(R(TB, YB), LargeXB)
-//
-//    it("must have been able to instantiate the curves") {
-//      Rt_xy must not be null
-//      Rxy_t must not be null
-//      Rtxy must not be null
-//      Rxt_y must not be null
-//      Rty_x must not be null
-//    }
-//
-//    it("must produce valid query ranges for different curves") {
-//      val queryTXY: Seq[Option[Extent[_]]] = Seq(qTOpt, qXOpt, qYOpt)
-//      val queryXYT: Seq[Option[Extent[_]]] = Seq(qXOpt, qYOpt, qTOpt)
-//
-//      // background
-//      getRanges(s"x$CardinalityPerDimensionB", R(XB), Seq(qXOpt), None, None, printCellDetails = true)
-//      getRanges(s"x:$LargeCardinalityPerDimensionB", R(LargeXB), Seq(qXOpt), None, None, printCellDetails = true)
-//      getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
-//      getRanges(s"y:$LargeCardinalityPerDimensionB", R(LargeYB), Seq(qYOpt), None, None, printCellDetails = true)
-//      getRanges(s"t$CardinalityPerDimensionB", R(TB), Seq(qTOpt), None, None, printCellDetails = true)
-//      getRanges(s"t:$LargeCardinalityPerDimensionB", R(LargeTB), Seq(qTOpt), None, None, printCellDetails = true)
-//      getRanges(s"Rxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
-//      getRanges(s"Rxt:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(XB, TB), Seq(qXOpt, qTOpt), None, None, printCellDetails = true)
-//      getRanges(s"Rty:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(TB, YB), Seq(qTOpt, qYOpt), None, None, printCellDetails = true)
-//
-//      // form A uses bigger cells, so there should be fewer
-//      // (but all A-form curves should have the same number of cells)
-//      getRanges("Rtxy", Rtxy, queryTXY, Option(6), Option(30))
-//
-//      // form B uses smaller cells, so there should be more
-//      // (but all B-form curves should have the same number of cells)
-//      getRanges("Rt_xy", Rt_xy, queryTXY, Some(22), Some(44))
-//      getRanges("Rxy_t", Rxy_t, queryXYT, Some(2), Some(44))
-//    }
-//  }
+  describe("composed-curve variants using only R, x, y, and t") {
+    val Rtxy: SpaceFillingCurve = R(TA, XA, YA)
+    val Rxy_t: SpaceFillingCurve = R(R(XB, YB), LargeTB)
+    val Rt_xy: SpaceFillingCurve = R(LargeTB, R(XB, YB))
+    val Rxt_y: SpaceFillingCurve = R(R(XB, TB), LargeYB)
+    val Rty_x: SpaceFillingCurve = R(R(TB, YB), LargeXB)
+
+    it("must have been able to instantiate the curves") {
+      Rt_xy must not be null
+      Rxy_t must not be null
+      Rtxy must not be null
+      Rxt_y must not be null
+      Rty_x must not be null
+    }
+
+    it("must produce valid query ranges for different curves") {
+      val queryTXY: Seq[Option[Extent[_]]] = Seq(qTOpt, qXOpt, qYOpt)
+      val queryXYT: Seq[Option[Extent[_]]] = Seq(qXOpt, qYOpt, qTOpt)
+
+      // background
+      getRanges(s"x$CardinalityPerDimensionB", R(XB), Seq(qXOpt), None, None, printCellDetails = true)
+      getRanges(s"x:$LargeCardinalityPerDimensionB", R(LargeXB), Seq(qXOpt), None, None, printCellDetails = true)
+      getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
+      getRanges(s"y:$LargeCardinalityPerDimensionB", R(LargeYB), Seq(qYOpt), None, None, printCellDetails = true)
+      getRanges(s"t$CardinalityPerDimensionB", R(TB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"t:$LargeCardinalityPerDimensionB", R(LargeTB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"Rxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
+      getRanges(s"Rxt:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(XB, TB), Seq(qXOpt, qTOpt), None, None, printCellDetails = true)
+      getRanges(s"Rty:${CardinalityPerDimensionB*CardinalityPerDimensionB}", R(TB, YB), Seq(qTOpt, qYOpt), None, None, printCellDetails = true)
+
+      // form A uses bigger cells, so there should be fewer
+      // (but all A-form curves should have the same number of cells)
+      getRanges("Rtxy", Rtxy, queryTXY, Option(6), Option(30))
+
+      // form B uses smaller cells, so there should be more
+      // (but all B-form curves should have the same number of cells)
+      getRanges("Rt_xy", Rt_xy, queryTXY, Some(22), Some(44))
+      getRanges("Rxy_t", Rxy_t, queryXYT, Some(2), Some(44))
+    }
+  }
 
   // only supports 2- and 3-dimensional curves
   def Z(children: Discretizor*): SpaceFillingCurve = {
@@ -171,46 +171,46 @@ class ComposedCurveSpec extends FunSpec with Matchers {
     }
   }
 
-//  describe("composed curves using R, Z, H, x, y, and t") {
-//    val Ztxy: SpaceFillingCurve = Z(TA, XA, YA)
-//    val RtZxy: SpaceFillingCurve = R(LargeTB, Z(XB, YB))
-//    val RtHxy: SpaceFillingCurve = R(LargeTB, H(XB, YB))
-//    val HtZxy: SpaceFillingCurve = H(LargeTB, Z(XB, YB))
-//    val RZxy_t: SpaceFillingCurve = R(Z(XB, YB), LargeTB)
-//    val RHxy_t: SpaceFillingCurve = R(H(XB, YB), LargeTB)
-//    val HZxy_t: SpaceFillingCurve = H(Z(XB, YB), LargeTB)
-//
-//    it("must be able to instantiate the curves") {
-//      RtZxy must not be null
-//      RtHxy must not be null
-//      Ztxy must not be null
-//      HtZxy must not be null
-//      RZxy_t must not be null
-//      RHxy_t must not be null
-//      HZxy_t must not be null
-//    }
-//
-//    it("must produce valid query ranges for different curves") {
-//      // background
-//      getRanges(s"t:$LargeCardinalityPerDimensionB", R(LargeTB), Seq(qTOpt), None, None, printCellDetails = true)
-//      getRanges(s"Zxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", Z(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
-//      getRanges(s"Hxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", H(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
-//      getRanges(s"t$CardinalityPerDimensionB", R(TB), Seq(qTOpt), None, None, printCellDetails = true)
-//      getRanges(s"x$CardinalityPerDimensionB", R(XB), Seq(qXOpt), None, None, printCellDetails = true)
-//      getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
-//
-//      // form A should have fewer cells
-//      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt), Some(28), Some(30))
-//
-//      // all B-form curves should have similar numbers of cells
-//      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(44), Some(44))
-//      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt), Some(22), Some(44))
-//      getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(44), Some(44))
-//      getRanges("RZxy_t", RZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(2), Some(44))
-//      getRanges("RHxy_t", RHxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(2), Some(44))
-//      getRanges("HZxy_t", HZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(44), Some(44))
-//    }
-//  }
+  describe("composed curves using R, Z, H, x, y, and t") {
+    val Ztxy: SpaceFillingCurve = Z(TA, XA, YA)
+    val RtZxy: SpaceFillingCurve = R(LargeTB, Z(XB, YB))
+    val RtHxy: SpaceFillingCurve = R(LargeTB, H(XB, YB))
+    val HtZxy: SpaceFillingCurve = H(LargeTB, Z(XB, YB))
+    val RZxy_t: SpaceFillingCurve = R(Z(XB, YB), LargeTB)
+    val RHxy_t: SpaceFillingCurve = R(H(XB, YB), LargeTB)
+    val HZxy_t: SpaceFillingCurve = H(Z(XB, YB), LargeTB)
+
+    it("must be able to instantiate the curves") {
+      RtZxy must not be null
+      RtHxy must not be null
+      Ztxy must not be null
+      HtZxy must not be null
+      RZxy_t must not be null
+      RHxy_t must not be null
+      HZxy_t must not be null
+    }
+
+    it("must produce valid query ranges for different curves") {
+      // background
+      getRanges(s"t:$LargeCardinalityPerDimensionB", R(LargeTB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"Zxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", Z(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
+      getRanges(s"Hxy:${CardinalityPerDimensionB*CardinalityPerDimensionB}", H(XB, YB), Seq(qXOpt, qYOpt), None, None, printCellDetails = true)
+      getRanges(s"t$CardinalityPerDimensionB", R(TB), Seq(qTOpt), None, None, printCellDetails = true)
+      getRanges(s"x$CardinalityPerDimensionB", R(XB), Seq(qXOpt), None, None, printCellDetails = true)
+      getRanges(s"y$CardinalityPerDimensionB", R(YB), Seq(qYOpt), None, None, printCellDetails = true)
+
+      // form A should have fewer cells
+      getRanges("Ztxy", Ztxy, Seq(qTOpt, qXOpt, qYOpt), Some(28), Some(30))
+
+      // all B-form curves should have similar numbers of cells
+      getRanges("RtZxy", RtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(44), Some(44))
+      getRanges("RtHxy", RtHxy, Seq(qTOpt, qXOpt, qYOpt), Some(22), Some(44))
+      getRanges("HtZxy", HtZxy, Seq(qTOpt, qXOpt, qYOpt), Some(44), Some(44))
+      getRanges("RZxy_t", RZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(2), Some(44))
+      getRanges("RHxy_t", RHxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(2), Some(44))
+      getRanges("HZxy_t", HZxy_t, Seq(qXOpt, qYOpt, qTOpt), Some(44), Some(44))
+    }
+  }
 
   describe("composed curves") {
     val dim4: Discretizor = new DoubleDimension(0.0, 1.0, 4)

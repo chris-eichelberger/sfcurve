@@ -7,18 +7,18 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 /**
   * This object contains definitions that are at the heart of the curve abstraction
   * and composition.  The main idea is that every curve innately consists of two
-  * different types of invertible transformations:  discretization and permutation.
+  * different types of transformations:  discretization and permutation.
   *
   * Discretization is responsible for translating between the (potentially continuous)
   * user space and the (always discrete) index space.  Given a point in user space,
-  * it must always be possible to identify which grid-cell it belongs in.  The
-  * inverse is less clean:  Given a grid-cell, it maps back to a cell, or a collection
+  * it must always be possible to identify which (indexed) grid-cell it belongs to.  The
+  * inverse is less clean:  Given an index, it maps back to a cell, or a collection
   * of ranges per dimension, in user space.
   *
   * Permutation is how the space-filling curve orders grid-cell indexes.
   *
   * An important implication of separating these two capabilities is that we can
-  * compose (think:  nest) space-filling curves.  Instead of baking WGS84 into
+  * compose (think:  nest) space-filling curves.  Instead of baking 9 bits of (lat, lon) into
   * a Z-order curve, recognize that the curve is more properly expressed as:
   *
   *   Z-order (implicitly 9 bits)
@@ -27,8 +27,8 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
   *   |
   *   +-- longitude:  5 bits; [-180, 180)
   *
-  * In this form, the dimensions are functions nested beneath the Z-order curve,
-  * itself a function.  That gives us the flexibility to nest curves like this:
+  * In this form, the dimensions are discretizors nested beneath the Z-order curve,
+  * itself a permutation.  That gives us the flexibility to nest curves like this:
   *
   *   Row-major (implicitly 20 bits)
   *   |
@@ -63,6 +63,9 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
   *     number of ranges to plan than any of its children.  This will become slow
   *     for all but the easy/simple cases (such as this example).
   *
+  * The base curves -- Z2, Z3, etc. -- are unaffected by the changes in this file.
+  * Instead, what this does is to add new capabilities.  See the `composition`
+  * module for examples and unit tests that illustrate how to build composed curves.
   */
 object Dimensions {
   case class Extent[T](min: T, max: T, incMin: Boolean = true, incMax: Boolean = false)(implicit ev: Ordering[T]) {

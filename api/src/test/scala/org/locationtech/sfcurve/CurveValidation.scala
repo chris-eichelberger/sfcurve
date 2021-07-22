@@ -6,7 +6,7 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
 import scala.Console.err
 
 /**
- * This object is used to describe tests that should ONLY BE RUN ON SMALL CURVES
+ * This class is used to describe tests that should ONLY BE RUN ON SMALL CURVES
  * because it does exhaustive testing about the indexing to make sure tha the
  * curve represents a valid permutation.
  */
