@@ -1,7 +1,15 @@
+/***********************************************************************
+ * Copyright (c) 2013-2021 Commonwealth Computer Research, Inc.
+ * All rights reserved. This program and the accompanying materials
+ * are made available under the terms of the Apache License, Version 2.0
+ * which accompanies this distribution and is available at
+ * http://www.opensource.org/licenses/apache2.0.php.
+ ***********************************************************************/
+
 package org.locationtech.sfcurve
 
 object Utilities {
-  // copied from https://github.com/aheyne/geomesa/blob/master/geomesa-utils/src/main/scala/org/locationtech/geomesa/utils/iterators/CartesianProductIterable.scala
+  // copied from https://github.com/locationtech/geomesa/blob/main/geomesa-utils/src/main/scala/org/locationtech/geomesa/utils/iterators/CartesianProductIterable.scala
   /**
     * Can create an iterator over all combinations of items from a list-of-lists.
     * Because the final list of combinations can be large, we allow for a safe
