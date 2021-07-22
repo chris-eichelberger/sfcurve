@@ -4,10 +4,9 @@ import org.locationtech.sfcurve.Dimensions._
 import org.locationtech.sfcurve.composition.ImplicitCasts._
 import org.locationtech.sfcurve.hilbert.HilbertCurve2D
 import org.locationtech.sfcurve.zorder.{ZCurve2D, ZCurve3D}
-import org.locationtech.sfcurve.{Dimensions, IndexRange, RowMajorSFC}
+import org.locationtech.sfcurve.{CurveValidation, Dimensions, IndexRange, RowMajorSFC}
 import org.scalatest.MustMatchers.convertToAnyMustWrapper
 import org.scalatest.{FunSpec, Matchers}
-
 import Dimensions.DoubleDimension
 
 import java.text.SimpleDateFormat
@@ -220,21 +219,26 @@ class ComposedCurveSpec extends FunSpec with Matchers {
       val dim8: Discretizor = new DoubleDimension(0.0, 1.0, 8)
       val dim16: Discretizor = new DoubleDimension(0.0, 1.0, 16)
 
+      def writeAndValidate(curve: SpaceFillingCurve): Boolean = {
+        CurveTextWriter.writeText(curve)
+        CurveValidation(curve).isValid
+      }
+
       // pure 2D squares
-//      CurveTextWriter.writeText(R(dim8, dim8))
-//      CurveTextWriter.writeText(Z(dim8, dim8))
-//      CurveTextWriter.writeText(H(dim8, dim8))
+//      writeAndValidate(R(dim8, dim8))
+//      writeAndValidate(Z(dim8, dim8))
+//      writeAndValidate(H(dim8, dim8))
 //
 //      // hybrid 2D squares don't really make any sense, but they exist
 //
 //      // pure 3D cubes (not supported by Hilbert as yet)
-//      CurveTextWriter.writeText(R(dim4, dim4, dim4))
-//      CurveTextWriter.writeText(Z(dim4, dim4, dim4))
+//      writeAndValidate(R(dim4, dim4, dim4))
+//      writeAndValidate(Z(dim4, dim4, dim4))
 
       // hybrid 3D cubes
-      CurveTextWriter.writeText(H(dim16, R(dim4, dim4)))
-      //CurveTextWriter.writeText(R(dim16, H(dim4, dim4)))
-      //CurveTextWriter.writeText(R(dim8, Z(dim4, dim4)))
+      writeAndValidate(H(dim16, R(dim4, dim4))) must be(true)
+      //writeAndValidate(R(dim16, H(dim4, dim4)))
+      //writeAndValidate(R(dim8, Z(dim4, dim4)))
     }
   }
 }
