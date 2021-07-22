@@ -27,76 +27,92 @@ object HilbertCurve2DProvider {
   val RESOLUTION_PARAM = "hilbert.resolution"
 }
 
-class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D {
-  val precision = math.pow(2, resolution).toLong
-  val chc = new CompactHilbertCurve(Array(resolution, resolution))
+/**
+  * Represents a two-dimensional Hilbert curve.  This class is just a facade, with the
+  * Uzaygezen library doing all of the heavy lifting.
+  *
+  * NB:  Because of the parent contract, this will always be a square Hilbert curve.
+  *
+  * @param bitsPerDimension the number of bits resolution to use in EACH of the two dimensions
+  */
+class HilbertCurve2D(bitsPerDimension: Int) extends SpaceFillingCurve2D(bitsPerDimension) with IdentityRangeConsolidator {
+  require(bitsPerDimension > 0, "Bits/dimension is negative; this probably means you tried to pass in a Long value that was too large")
+  require(bitsPerDimension <= 31, s"Bits/dimension is too large; must be no more than 31")
+  val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))
 
-  final def getNormalizedLongitude(x: Double): Long = 
-    ((x + 180) * (precision - 1) / 360d).toLong
-//    (x * (precision - 1) / 360d).toLong
+  override val name: String = "Hilbert"
 
-  final def getNormalizedLatitude(y: Double): Long =
-    ((y + 90) * (precision - 1) / 180d).toLong
-//    (y * (precision - 1) / 180d).toLong
+  def fold(subordinates: Seq[Long]): Long = {
+    require(subordinates.length == 2)
 
-  final def setNormalizedLatitude(latNormal: Long) = {
-    if(!(latNormal >= 0 && latNormal <= precision))
-      throw new NumberFormatException("Normalized latitude must be greater than 0 and less than the maximum precision")
+    val normX = subordinates.head
+    val normY = subordinates.last
 
-    latNormal * 180d / (precision - 1)
-  }
-
-  final def setNormalizedLongitude(lonNormal: Long) = {
-    if(!(lonNormal >= 0 && lonNormal <= precision))
-      throw new NumberFormatException("Normalized longitude must be greater than 0 and less than the maximum precision")
-
-    lonNormal * 360d / (precision - 1)
-  }
-
-
-  def toIndex(x: Double, y: Double): Long = {
-    val normX = getNormalizedLongitude(x)
-    val normY = getNormalizedLatitude(y)
-    val p = 
+    val p =
       Array[BitVector](
-        BitVectorFactories.OPTIMAL(resolution),
-        BitVectorFactories.OPTIMAL(resolution)
+        BitVectorFactories.OPTIMAL(bitsPerDimension),
+        BitVectorFactories.OPTIMAL(bitsPerDimension)
       )
 
     p(0).copyFrom(normX)
     p(1).copyFrom(normY)
 
-    val hilbert = BitVectorFactories.OPTIMAL.apply(resolution * 2)
+    val hilbert = BitVectorFactories.OPTIMAL.apply(bitsPerDimension * 2)
 
     chc.index(p,0,hilbert)
     hilbert.toLong
   }
 
-  def toPoint(i: Long): (Double, Double) = {
-    val h = BitVectorFactories.OPTIMAL.apply(resolution*2)
-    h.copyFrom(i)
-    val p = 
+  def unfold(index: Long): Vector[Long] = {
+    val h = BitVectorFactories.OPTIMAL.apply(bitsPerDimension*2)
+    h.copyFrom(index)
+    val p =
       Array[BitVector](
-        BitVectorFactories.OPTIMAL(resolution),
-        BitVectorFactories.OPTIMAL(resolution)
+        BitVectorFactories.OPTIMAL(bitsPerDimension),
+        BitVectorFactories.OPTIMAL(bitsPerDimension)
       )
 
     chc.indexInverse(h,p)
 
-    val x = setNormalizedLongitude(p(0).toLong) - 180
-    val y = setNormalizedLatitude(p(1).toLong) - 90
-    (x, y)
+    Vector(p(0).toLong, p(1).toLong)
   }
 
-  def toRanges(xmin: Double, ymin: Double, xmax: Double, ymax: Double, hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
-    val chc = new CompactHilbertCurve(Array[Int](resolution, resolution))
+  // the Uzaygezen implementation returns ranges in consistently /descending/ order
+  def indexRanges(lowerCorner: Seq[Long], upperCorner: Seq[Long], hints: Option[RangeComputeHints] = None): Seq[IndexRange] = {
+    require(lowerCorner.size == 2)
+    val minNormalizedLongitude = lowerCorner.head
+    val minNormalizedLatitude = lowerCorner.last
+    require(upperCorner.size == 2)
+    val maxNormalizedLongitude = upperCorner.head
+    val maxNormalizedLatitude = upperCorner.last
+
+    // dummy check for a single-cell overlap (which Uzaygezen does /not/ like)
+    if (minNormalizedLongitude == maxNormalizedLongitude && minNormalizedLatitude == maxNormalizedLatitude) {
+      val idx = fold(Seq(minNormalizedLongitude, minNormalizedLatitude))
+      return Seq(IndexRange(idx, idx, contained = true))
+    }
+
+    // dummy check for a single-cell strip (which Uzaygezen does /not/ like)
+    if (minNormalizedLongitude == maxNormalizedLongitude) {
+      // vertical strip
+      return (for (normalizedLat <- minNormalizedLatitude to maxNormalizedLatitude) yield {
+        val idx = fold(Seq(minNormalizedLongitude, normalizedLat))
+        IndexRange(idx, idx, contained = true)
+      }).toSeq
+    }
+    if (minNormalizedLatitude == maxNormalizedLatitude) {
+      // horizontal strip
+      return (for (normalizedLon <- minNormalizedLongitude to maxNormalizedLongitude) yield {
+        val idx = fold(Seq(normalizedLon, minNormalizedLatitude))
+        IndexRange(idx, idx, contained = true)
+      }).toSeq
+    }
+    if (minNormalizedLongitude == maxNormalizedLongitude || minNormalizedLatitude == maxNormalizedLatitude) {
+      throw new Exception(s"Single-cell strip should not be possible:  long ($minNormalizedLongitude, $maxNormalizedLongitude), lat ($minNormalizedLatitude, $maxNormalizedLatitude)")
+    }
+
+    val chc = new CompactHilbertCurve(Array[Int](bitsPerDimension, bitsPerDimension))
     val region = new java.util.ArrayList[LongRange]()
-
-    val minNormalizedLongitude = getNormalizedLongitude(xmin)
-    val minNormalizedLatitude  = getNormalizedLatitude(ymin) 
-
-    val maxNormalizedLongitude = getNormalizedLongitude(xmax)
-    val maxNormalizedLatitude  = getNormalizedLatitude(ymax) 
 
     region.add(LongRange.of(minNormalizedLongitude,maxNormalizedLongitude))
     region.add(LongRange.of(minNormalizedLatitude,maxNormalizedLatitude))
@@ -138,4 +154,5 @@ class HilbertCurve2D(resolution: Int) extends SpaceFillingCurve2D {
     }
     result
   }
+
 }
