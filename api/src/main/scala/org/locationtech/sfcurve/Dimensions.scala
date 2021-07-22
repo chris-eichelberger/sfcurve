@@ -201,62 +201,36 @@ object Dimensions {
     }
   }
 
-  // defined over [-180.0, 180.0)
-  case class Longitude(cardinality: Long) extends Dimension[Double] {
+  class DoubleDimension(min: Double, max: Double, val cardinality: Long) extends Dimension[Double] {
+    require(max > min)
     val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](-180.0, 180.0, incMin = true, incMax = false)
+    val extent: Extent[Double] = Extent[Double](min, max, incMin = true, incMax = false)
+    val length: Double = max - min
     override def normalize(value: Double): Double = {
       var v = value
-      while (v < -180.0) v += 360.0
-      while (v >= 180.0) v -= 360.0
+      while (v < min) v += length
+      while (v >= max) v -= length
       v
     }
+    override def toString: String = {
+      s"DoubleDimension:  [$min, $max), cardinality $cardinality)"
+    }
   }
+
+  // defined over [-180.0, 180.0)
+  case class Longitude(override val cardinality: Long) extends DoubleDimension(-180.0, 180.0, cardinality)
 
   // defined over [-90.0, 90.0)
-  case class Latitude(cardinality: Long) extends Dimension[Double] {
-    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](-90.0, 90.0, incMin = true, incMax = true)
-    override def normalize(value: Double): Double = {
-      var v = value
-      while (v < -90.0) v += 180.0
-      while (v > 90.0) v -= 180.0
-      v
-    }
-  }
+  case class Latitude(override val cardinality: Long) extends DoubleDimension(-90.0, 90.0, cardinality)
 
-  // defined over [0.0, 360.0)
-  case class NonNegativeLongitude(cardinality: Long) extends Dimension[Double] {
-    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](0.0, 360.0, incMin = true, incMax = false)
-    override def normalize(value: Double): Double = {
-      var v = value
-      while (v < 0.0) v += 360.0
-      while (v >= 360.0) v -= 360.0
-      v
-    }
-  }
+  // defined over [-180.0, 180.0)
+  case class NonNegativeLongitude(override val cardinality: Long) extends DoubleDimension(0.0, 360.0, cardinality)
 
-  // defined over [0.0, 180.0)
-  case class NonNegativeLatitude(cardinality: Long) extends Dimension[Double] {
-    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](0.0, 180.0, incMin = true, incMax = false)
-    override def normalize(value: Double): Double = {
-      var v = value
-      while (v < 0.0) v += 180.0
-      while (v > 180.0) v -= 180.0
-      v
-    }
-  }
+  // defined over [-90.0, 90.0)
+  case class NonNegativeLatitude(override val cardinality: Long) extends DoubleDimension(0.0, 180.0, cardinality)
 
-  case class AltitudeInMeters(cardinality: Long) extends Dimension[Double] {
-    val ev: DimensionLike[Double] = implicitly[DimensionLike[Double]]
-    val extent: Extent[Double] = Extent[Double](-11000.0, 17000.0, incMin = true, incMax = false)
-    override def normalize(value: Double): Double = {
-      if (!extent.contains(value)) throw new Exception(s"Invalid altitude in meters:  $value")
-      value
-    }
-  }
+  // defined over [-90.0, 90.0)
+  case class AltitudeInMeters(override val cardinality: Long) extends DoubleDimension(-11000.0, 17000.0, cardinality)
 
   case class DateDimension(extent: Extent[Date], cardinality: Long) extends Dimension[Date] {
     val ev: DimensionLike[Date] = implicitly[DimensionLike[Date]]
@@ -308,6 +282,13 @@ object Dimensions {
 
     // how many dimension leaf-nodes are there?
     def arity: Int = children.map(_.arity).sum
+
+    // fetch the leaf-node discretizors (dimensions, typically)
+    def leaves: Vector[Discretizor] = children.map {
+      case _: SpaceFillingCurve => leaves
+      case dimension: Dimension[_] => Vector(dimension)
+      case other => throw new Exception(s"Invalid SFC child type:  ${other.getClass}")
+    }.reduce(_ ++ _)
 
     // these routines are the heart of the SFC;
     // they will be made concrete per descendant curve
