@@ -213,32 +213,54 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 //  }
 
   describe("composed curves") {
-    it("should look right when printed") {
-      val dim2: Discretizor = new DoubleDimension(0.0, 1.0, 2)
-      val dim4: Discretizor = new DoubleDimension(0.0, 1.0, 4)
-      val dim8: Discretizor = new DoubleDimension(0.0, 1.0, 8)
-      val dim16: Discretizor = new DoubleDimension(0.0, 1.0, 16)
+    val dim4: Discretizor = new DoubleDimension(0.0, 1.0, 4)
+    val dim8: Discretizor = new DoubleDimension(0.0, 1.0, 8)
+    val dim16: Discretizor = new DoubleDimension(0.0, 1.0, 16)
+    val dim5bit: Discretizor = new DoubleDimension(0.0, 1.0, 1L << 5L)
+    val dim10bit: Discretizor = new DoubleDimension(0.0, 1.0, 1L << 10L)
 
+    it("should look right when printed") {
       def writeAndValidate(curve: SpaceFillingCurve): Boolean = {
         CurveTextWriter.writeText(curve)
         CurveValidation(curve).isValid
       }
 
       // pure 2D squares
-//      writeAndValidate(R(dim8, dim8))
-//      writeAndValidate(Z(dim8, dim8))
-//      writeAndValidate(H(dim8, dim8))
-//
-//      // hybrid 2D squares don't really make any sense, but they exist
-//
-//      // pure 3D cubes (not supported by Hilbert as yet)
-//      writeAndValidate(R(dim4, dim4, dim4))
-//      writeAndValidate(Z(dim4, dim4, dim4))
+      writeAndValidate(R(dim8, dim8)) must be(true)
+      writeAndValidate(Z(dim8, dim8)) must be(true)
+      writeAndValidate(H(dim8, dim8)) must be(true)
+
+      // hybrid 2D squares don't really make any sense, but they exist
+
+      // pure 3D cubes (not supported by Hilbert as yet)
+      writeAndValidate(R(dim4, dim4, dim4)) must be(true)
+      writeAndValidate(Z(dim4, dim4, dim4)) must be(true)
 
       // hybrid 3D cubes
       writeAndValidate(H(dim16, R(dim4, dim4))) must be(true)
-      //writeAndValidate(R(dim16, H(dim4, dim4)))
-      //writeAndValidate(R(dim8, Z(dim4, dim4)))
+      writeAndValidate(R(dim16, H(dim4, dim4))) must be(true)
+      writeAndValidate(R(dim8, Z(dim4, dim4))) must be(true)
+    }
+
+    it("should be valid at larger scales") {
+      println("Validating larger composed curves...")
+
+      // pure 2D
+      CurveValidation(R(dim10bit, dim10bit)).isValid must be(true)
+      CurveValidation(Z(dim10bit, dim10bit)).isValid must be(true)
+      CurveValidation(H(dim10bit, dim10bit)).isValid must be(true)
+
+      // pure 3D (there is no 3D Hilbert implementation here)
+      CurveValidation(R(dim5bit, dim5bit, dim5bit)).isValid must be(true)
+      CurveValidation(Z(dim5bit, dim5bit, dim5bit)).isValid must be(true)
+
+      // composed 3D
+      CurveValidation(R(dim10bit, Z(dim5bit, dim5bit))).isValid must be(true)
+      CurveValidation(Z(dim10bit, R(dim5bit, dim5bit))).isValid must be(true)
+      CurveValidation(R(dim10bit, H(dim5bit, dim5bit))).isValid must be(true)
+      CurveValidation(H(dim10bit, R(dim5bit, dim5bit))).isValid must be(true)
+      CurveValidation(H(dim10bit, Z(dim5bit, dim5bit))).isValid must be(true)
+      CurveValidation(Z(dim10bit, H(dim5bit, dim5bit))).isValid must be(true)
     }
   }
 }

@@ -64,7 +64,7 @@ case class CurveValidation(curve: SpaceFillingCurve) {
   def topUnfoldWorks: Boolean = {
     val set: Set[Seq[Long]] = (0 until curve.cardinality.toInt).map(i => curve.unfold(i.toLong)).toSet
 
-    isValidPermutation[Seq[Long]](set, Seq(0, 0, 0), curve.children.map(_.cardinality - 1L))(CurveValidation.CoordinateOrdering)
+    isValidPermutation[Seq[Long]](set, Vector.fill(curve.children.size)(0), curve.children.map(_.cardinality - 1L))(CurveValidation.CoordinateOrdering)
   }
 
   // this tests the full curve, pure or composed, to make sure that
