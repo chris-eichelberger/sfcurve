@@ -146,32 +146,32 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 //      getRanges("Rxy_t", Rxy_t, queryXYT, Some(2), Some(44))
 //    }
 //  }
-//
-//  // only supports 2- and 3-dimensional curves
-//  def Z(children: Discretizor*): SpaceFillingCurve = {
-//    val subordinates: Vector[Discretizor] = Vector(children:_*)
-//    require(subordinates.size >= 2 && subordinates.size <= 3)
-//    subordinates.size match {
-//      case 2 =>
-//        new ZCurve2D(subordinates.head.cardinality.toInt) {
-//          override val children: Vector[Discretizor] = subordinates
-//        }
-//      case 3 =>
-//        new ZCurve3D(subordinates.head.cardinality.toInt) {
-//          override val children: Vector[Discretizor] = subordinates
-//        }
-//    }
-//  }
-//
-//  // only supports 2- and 3-dimensional curves
-//  def H(children: Discretizor*): SpaceFillingCurve = {
-//    val subordinates: Vector[Discretizor] = Vector(children:_*)
-//    require(subordinates.size == 2)
-//    new HilbertCurve2D(Dimensions.bitsFromCardinality(subordinates.head.cardinality).toInt) {
-//      override val children: Vector[Discretizor] = subordinates
-//    }
-//  }
-//
+
+  // only supports 2- and 3-dimensional curves
+  def Z(children: Discretizor*): SpaceFillingCurve = {
+    val subordinates: Vector[Discretizor] = Vector(children:_*)
+    require(subordinates.size >= 2 && subordinates.size <= 3)
+    subordinates.size match {
+      case 2 =>
+        new ZCurve2D(subordinates.head.cardinality.toInt) {
+          override val children: Vector[Discretizor] = subordinates
+        }
+      case 3 =>
+        new ZCurve3D(subordinates.head.cardinality.toInt) {
+          override val children: Vector[Discretizor] = subordinates
+        }
+    }
+  }
+
+  // only supports 2- and 3-dimensional curves
+  def H(children: Discretizor*): SpaceFillingCurve = {
+    val subordinates: Vector[Discretizor] = Vector(children:_*)
+    require(subordinates.size == 2)
+    new HilbertCurve2D(Dimensions.bitsFromCardinality(subordinates.head.cardinality).toInt) {
+      override val children: Vector[Discretizor] = subordinates
+    }
+  }
+
 //  describe("composed curves using R, Z, H, x, y, and t") {
 //    val Ztxy: SpaceFillingCurve = Z(TA, XA, YA)
 //    val RtZxy: SpaceFillingCurve = R(LargeTB, Z(XB, YB))
@@ -215,7 +215,12 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 
   describe("composed curves") {
     it("should look right when printed") {
-      CurveTextWriter.writeText(R(new DoubleDimension(0.0, 1.0, 4)))
+      val dim4: Discretizor = new DoubleDimension(0.0, 1.0, 4)
+      val dim8: Discretizor = new DoubleDimension(0.0, 1.0, 8)
+
+      CurveTextWriter.writeText(R(dim8, dim8))
+      CurveTextWriter.writeText(Z(dim8, dim8))
+      CurveTextWriter.writeText(H(dim8, dim8))
     }
   }
 }

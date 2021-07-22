@@ -26,10 +26,10 @@ object CurveTextWriter {
     write(s"Slice size:  $width columns by $height rows")
 
     // draw this grid slice
-    val HR: String = "+" + ("-" * cellWidth + "+") * width.toInt
-    for (row <- 0 until height) {
+    val HR: String = "+" + ("-" * (2 + cellWidth) + "+") * width.toInt
+    for (row <- (0 until height).reverse) {
       write(HR)
-      "|" + ((0 until width).map(col => ("%" + cellWidth.toString + "d").format(indexer(Seq[Long](row, col) ++ higherCoord)) + "|"))
+      write((0 until width).map(col => ("%" + cellWidth.toString + "d").format(indexer(Seq[Long](col, row) ++ higherCoord))).mkString("| ", " | ", " |"))
     }
     write(HR)
   }
@@ -49,9 +49,11 @@ object CurveTextWriter {
     val width: Int = leaves(0).cardinality.toInt
     val height: Int = if (leaves.length > 1) leaves(1).cardinality.toInt else 1
 
+    val cellWidth: Int = Math.ceil(Math.log10(curve.cardinality)).toInt
+
     val higherCardinalities: Vector[Vector[Long]] = curve.children.drop(2).map(child => (0 until child.cardinality.toInt).map(_.toLong).toVector)
     CartesianProductIterable(higherCardinalities).iterator.foreach { higherCoord =>
-      writeGrid(write, higherCoord.asInstanceOf[Seq[Long]], width, height, curve.fold)
+      writeGrid(write, higherCoord.asInstanceOf[Seq[Long]], width, height, curve.fold, cellWidth)
     }
   }
 }
