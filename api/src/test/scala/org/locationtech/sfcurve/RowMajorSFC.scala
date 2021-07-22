@@ -16,6 +16,8 @@ import org.locationtech.sfcurve.Utilities.CartesianProductIterable
   * @param maxGap the maximum allowable gap between query ranges
   */
 case class RowMajorSFC(children: Vector[Discretizor], maxGap: Long = 0) extends SpaceFillingCurve with InMemoryRangeConsolidator {
+  override val name: String = "RowMajor"
+
   val ascendingCardinalities: Seq[Long] = children.map(_.cardinality).drop(1).scan(1L)(_ * _).reverse
   require(ascendingCardinalities.size == children.size)
 

@@ -40,7 +40,7 @@ class HilbertCurve2D(bitsPerDimension: Int) extends SpaceFillingCurve2D(bitsPerD
   require(bitsPerDimension <= 31, s"Bits/dimension is too large; must be no more than 31")
   val chc = new CompactHilbertCurve(Array(bitsPerDimension, bitsPerDimension))
 
-  val name: String = "Hilbert"
+  override val name: String = "Hilbert"
 
   def fold(subordinates: Seq[Long]): Long = {
     require(subordinates.length == 2)

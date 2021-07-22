@@ -163,7 +163,7 @@ class ComposedCurveSpec extends FunSpec with Matchers {
     }
   }
 
-  // only supports 2- and 3-dimensional curves
+  // only supports 2-dimensional curves
   def H(children: Discretizor*): SpaceFillingCurve = {
     val subordinates: Vector[Discretizor] = Vector(children:_*)
     require(subordinates.size == 2)
@@ -215,12 +215,25 @@ class ComposedCurveSpec extends FunSpec with Matchers {
 
   describe("composed curves") {
     it("should look right when printed") {
+      val dim2: Discretizor = new DoubleDimension(0.0, 1.0, 2)
       val dim4: Discretizor = new DoubleDimension(0.0, 1.0, 4)
       val dim8: Discretizor = new DoubleDimension(0.0, 1.0, 8)
 
-      CurveTextWriter.writeText(R(dim8, dim8))
-      CurveTextWriter.writeText(Z(dim8, dim8))
-      CurveTextWriter.writeText(H(dim8, dim8))
+      // pure 2D squares
+//      CurveTextWriter.writeText(R(dim8, dim8))
+//      CurveTextWriter.writeText(Z(dim8, dim8))
+//      CurveTextWriter.writeText(H(dim8, dim8))
+//
+//      // hybrid 2D squares don't really make any sense, but they exist
+//
+//      // pure 3D cubes (not supported by Hilbert as yet)
+//      CurveTextWriter.writeText(R(dim4, dim4, dim4))
+//      CurveTextWriter.writeText(Z(dim4, dim4, dim4))
+
+      // hybrid 3D cubes (again, without Hilbert at top level)
+      val curve = R(dim8, Z(dim4, dim4))
+      CurveTextWriter.writeText(curve)
+      //CurveTextWriter.writeText(R(dim8, Z(dim4, dim4)))
     }
   }
 }

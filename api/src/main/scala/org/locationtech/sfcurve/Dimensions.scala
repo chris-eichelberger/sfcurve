@@ -213,7 +213,7 @@ object Dimensions {
       v
     }
     override def toString: String = {
-      s"DoubleDimension:  [$min, $max), cardinality $cardinality)"
+      s"DoubleDimension(extent [$min, $max), cardinality $cardinality)"
     }
   }
 
@@ -273,6 +273,8 @@ object Dimensions {
     Math.ceil(Math.log(cardinality.toDouble) / Math.log(2.0)).toLong
 
   trait SpaceFillingCurve extends Discretizor with RangeConsolidator {
+    def name: String = getClass.getName
+
     def children: Vector[Discretizor]
 
     //require(children != null && children.nonEmpty)
@@ -285,8 +287,9 @@ object Dimensions {
 
     // fetch the leaf-node discretizors (dimensions, typically)
     def leaves: Vector[Discretizor] = children.map {
-      case _: SpaceFillingCurve => leaves
-      case dimension: Dimension[_] => Vector(dimension)
+      case curve: SpaceFillingCurve => curve.leaves
+      case dim: Dimension[_] =>
+        Vector(dim)
       case other => throw new Exception(s"Invalid SFC child type:  ${other.getClass}")
     }.reduce(_ ++ _)
 
@@ -369,5 +372,8 @@ object Dimensions {
       consolidateRanges(rangesToConsolidate, maxGap)
     }
 
+    override def toString: String = {
+      name + children.map(_.toString).mkString("(", ", ", ")")
+    }
   }
 }
